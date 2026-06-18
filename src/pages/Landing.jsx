@@ -34,8 +34,6 @@ const categorias = [
   { label: 'Limpieza e higiene', slug: 'limpieza', icon: SprayCan, color: 'bg-green-50 text-green-500' },
 ]
 
-const marcas = ['Pampers', 'Huggies', "Johnson's", 'Pequeñín', 'Bepanthen', 'Suavitel', 'Skip']
-
 const DESTACADOS_DEMO = [
   { id: '1', nombre: 'Pampers Etapas T2 x40', precio: 5850, stock: 18, categoria: 'pañales', marca: 'Pampers', imagen_url: null },
   { id: '6', nombre: 'Toallitas Pequeñín x80', precio: 2500, stock: 24, categoria: 'toallitas', marca: 'Pequeñín', imagen_url: null },
@@ -53,9 +51,10 @@ export default function Landing() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
   const [destacados, setDestacados] = useState([])
+  const [marcas, setMarcas] = useState([])
 
   useEffect(() => {
-    async function cargarDestacados() {
+    async function cargarDatos() {
       try {
         const { data, error } = await supabase
           .from('productos')
@@ -69,8 +68,22 @@ export default function Landing() {
       } catch {
         setDestacados(DESTACADOS_DEMO)
       }
+
+      try {
+        const { data } = await supabase
+          .from('productos')
+          .select('marca')
+          .eq('activo', true)
+          .not('marca', 'is', null)
+        if (data?.length) {
+          const unicas = [...new Set(data.map((p) => p.marca))].sort()
+          setMarcas(unicas)
+        }
+      } catch {
+        setMarcas(['Pampers', 'Huggies', "Johnson's", 'Pequeñín', 'Bepanthen', 'Suavitel', 'Skip'])
+      }
     }
-    cargarDestacados()
+    cargarDatos()
   }, [])
 
   const handleBuscar = (e) => {
@@ -234,16 +247,16 @@ export default function Landing() {
             <div>
               <span className="text-primary font-semibold text-sm uppercase tracking-wider">Sobre nosotros</span>
               <h2 className="font-display text-4xl font-black text-gray-900 mt-2 mb-5 leading-tight">
-                Una pañalera familiar hecha con amor
+                Nacimos en Rafaela,<br />crecimos con vos
               </h2>
               <p className="text-muted leading-relaxed mb-4">
-                Somos una pañalera familiar con sede en Rafaela, Santa Fe. Empezamos vendiendo en el barrio
-                y hoy llegamos a todo el país. Nos especializamos en todo lo que los bebés y las mamás necesitan,
-                con atención personalizada y precios accesibles.
+                Tatitos nació de entender algo simple: cuando tenés un bebé, no querés perder tiempo
+                buscando lo que necesitás. Querés encontrarlo rápido, a buen precio, y que te llegue sin drama.
+                Eso es exactamente lo que hacemos.
               </p>
               <p className="text-muted leading-relaxed mb-8">
-                Nuestro objetivo es que no te falte nada cuando más lo necesitás, con envíos rápidos
-                y stock siempre disponible de las mejores marcas.
+                Somos un emprendimiento rafaelino, familiar y con ganas de crecer junto a las familias de nuestra ciudad
+                y de todo el país. Queremos que cuando llegue tu pedido, sientas que lo armó alguien que entiende lo que es tener un bebé en casa — no una empresa que simplemente empaqueta y manda.
               </p>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
@@ -269,8 +282,8 @@ export default function Landing() {
 
             <div className="grid grid-cols-2 gap-4">
               {[
-                { num: '5+', label: 'Años de experiencia' },
-                { num: '13+', label: 'Marcas disponibles' },
+                { num: '1+', label: 'Año de experiencia' },
+                { num: marcas.length || '14', label: 'Marcas disponibles' },
                 { num: '100%', label: 'Envíos a todo el país' },
                 { num: '⭐', label: 'Atención personalizada' },
               ].map(({ num, label }) => (
@@ -290,16 +303,16 @@ export default function Landing() {
           <div className="text-center mb-12">
             <span className="text-primary font-semibold text-sm uppercase tracking-wider">Contacto</span>
             <h2 className="font-display text-4xl font-black text-gray-900 mt-2">
-              ¿Tenés alguna consulta?
+              Estamos para ayudarte
             </h2>
             <p className="text-muted mt-3 max-w-md mx-auto">
-              Escribinos por WhatsApp o seguinos en Instagram. Respondemos rápido.
+              ¿Duda con un producto? ¿Querés saber si hay stock? Escribinos sin compromiso — somos personas reales, no un bot.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
             <a
-              href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '5493492000000'}?text=Hola%20Tatitos%2C%20quiero%20consultar%20un%20pedido`}
+              href="https://wa.me/5493492710605?text=Hola%20Tatitos%2C%20quiero%20consultar%20un%20pedido"
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 text-center hover:scale-105 transition-transform duration-200 group"
@@ -308,11 +321,12 @@ export default function Landing() {
                 <Phone size={24} className="text-green-600" />
               </div>
               <h3 className="font-display font-bold text-gray-900 mb-1">WhatsApp</h3>
-              <p className="text-sm text-muted">Consultás y te respondemos al toque</p>
+              <p className="text-sm text-muted mb-2">Consultás y te respondemos al toque</p>
+              <p className="text-xs font-semibold text-green-600">+54 3492 710605</p>
             </a>
 
             <a
-              href="https://instagram.com/tatitospanalera"
+              href="https://instagram.com/tatitos_rafaela"
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 text-center hover:scale-105 transition-transform duration-200 group"
@@ -321,18 +335,22 @@ export default function Landing() {
                 <ExternalLink size={24} className="text-primary" />
               </div>
               <h3 className="font-display font-bold text-gray-900 mb-1">Instagram</h3>
-              <p className="text-sm text-muted">@tatitospanalera</p>
+              <p className="text-sm text-muted mb-3">Novedades, ofertas y productos nuevos</p>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold rounded-full">
+                Seguir @tatitos_rafaela
+              </span>
             </a>
 
             <a
-              href="mailto:tatitospanalera@gmail.com"
+              href="mailto:tatitosrafaela@gmail.com"
               className="card p-6 text-center hover:scale-105 transition-transform duration-200 group"
             >
               <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
                 <Mail size={24} className="text-blue-600" />
               </div>
               <h3 className="font-display font-bold text-gray-900 mb-1">Email</h3>
-              <p className="text-sm text-muted">tatitospanalera@gmail.com</p>
+              <p className="text-sm text-muted mb-2">Para consultas o pedidos especiales</p>
+              <p className="text-xs font-semibold text-blue-600">tatitosrafaela@gmail.com</p>
             </a>
           </div>
         </div>
@@ -342,10 +360,10 @@ export default function Landing() {
       <section className="py-16 bg-primary">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="font-display text-3xl font-bold text-white mb-4">
-            ¿Listo para hacer tu pedido?
+            Todo lo que tu bebé necesita, en un solo lugar
           </h2>
           <p className="text-pink-100 mb-8">
-            Explorá nuestro catálogo y sumá todo lo que necesitás al carrito.
+            Más de {marcas.length || 14} marcas, precios accesibles y envíos a todo el país. Empezá a comprar hoy.
           </p>
           <Link
             to="/tienda"
