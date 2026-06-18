@@ -38,6 +38,7 @@ export default function Producto() {
           .single()
 
         if (err || !data) {
+          console.error('[Producto] Error Supabase:', err, '| id:', id)
           setError(true)
           return
         }
@@ -59,19 +60,24 @@ export default function Producto() {
           .limit(4)
           .then(({ data: rel }) => { if (rel?.length) setRelacionados(rel) })
 
-        channel = supabase
-          .channel(`producto-${id}`)
-          .on('postgres_changes', {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'productos',
-            filter: `id=eq.${id}`,
-          }, (payload) => {
-            setProducto((prev) => ({ ...prev, ...payload.new }))
-          })
-          .subscribe()
+        try {
+          channel = supabase
+            .channel(`producto-${id}`)
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'productos',
+              filter: `id=eq.${id}`,
+            }, (payload) => {
+              setProducto((prev) => ({ ...prev, ...payload.new }))
+            })
+            .subscribe()
+        } catch {
+          // realtime no disponible, la vista funciona igual
+        }
 
-      } catch {
+      } catch (e) {
+        console.error('[Producto] EXCEPCION:', e)
         setError(true)
       } finally {
         setLoading(false)
@@ -101,6 +107,12 @@ export default function Producto() {
     imagen: producto.imagen_url || undefined,
     url: `/tienda/producto/${producto.id}`,
   } : {})
+
+  const todasLasImagenes = [
+    producto?.imagen_url,
+    ...(producto?.imagenes || []),
+  ].filter(Boolean)
+  const [imagenActiva, setImagenActiva] = useState(0)
 
   const tieneVariantes = producto?.variantes?.length > 0
   const precioActual = tieneVariantes && varianteSeleccionada
@@ -163,14 +175,35 @@ export default function Producto() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
-            {/* Imagen */}
-            <div className="aspect-square bg-white rounded-2xl shadow-sm flex items-center justify-center overflow-hidden">
-              {producto.imagen_url ? (
-                <img src={producto.imagen_url} alt={producto.nombre} className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-gray-300">
-                  <Package size={80} />
-                  <span className="text-sm">{producto.marca}</span>
+            {/* Galería */}
+            <div>
+              <div className="aspect-square bg-white rounded-2xl shadow-sm flex items-center justify-center overflow-hidden">
+                {todasLasImagenes.length > 0 ? (
+                  <img
+                    src={todasLasImagenes[imagenActiva]}
+                    alt={producto.nombre}
+                    className="w-full h-full object-cover transition-opacity duration-200"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-3 text-gray-300">
+                    <Package size={80} />
+                    <span className="text-sm">{producto.marca}</span>
+                  </div>
+                )}
+              </div>
+              {todasLasImagenes.length > 1 && (
+                <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                  {todasLasImagenes.map((url, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setImagenActiva(i)}
+                      className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors ${
+                        imagenActiva === i ? 'border-primary' : 'border-transparent hover:border-gray-300'
+                      }`}
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>

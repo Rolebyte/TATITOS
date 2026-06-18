@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Baby, Package, ShoppingBag, BarChart2, LogOut, Users, History } from 'lucide-react'
+import { Baby, Package, ShoppingBag, BarChart2, LogOut, Users, History, Tag, Megaphone } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 
 const navLinks = [
@@ -8,6 +8,8 @@ const navLinks = [
   { to: '/admin/ventas', label: 'Ventas', icon: BarChart2 },
   { to: '/admin/clientes', label: 'Clientes', icon: Users },
   { to: '/admin/historico', label: 'Historial TN', icon: History },
+  { to: '/admin/cupones', label: 'Cupones', icon: Tag },
+  { to: '/admin/promos', label: 'Promociones', icon: Megaphone },
 ]
 
 export default function AdminLayout() {

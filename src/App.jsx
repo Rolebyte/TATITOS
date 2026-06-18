@@ -15,10 +15,14 @@ import AdminStock from './pages/admin/AdminStock'
 import AdminVentas from './pages/admin/AdminVentas'
 import AdminClientes from './pages/admin/AdminClientes'
 import AdminHistorico from './pages/admin/AdminHistorico'
+import AdminCupones from './pages/admin/AdminCupones'
+import AdminPromos from './pages/admin/AdminPromos'
 import AdminLayout from './components/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import CarritoDrawer from './components/CarritoDrawer'
 import WhatsAppBoton from './components/WhatsAppBoton'
+import BarraPromo from './components/BarraPromo'
+import PopupPromo from './components/PopupPromo'
 
 function GlobalUI() {
   const location = useLocation()
@@ -26,6 +30,8 @@ function GlobalUI() {
   if (esAdmin) return null
   return (
     <>
+      <BarraPromo />
+      <PopupPromo />
       <CarritoDrawer />
       <WhatsAppBoton />
     </>
@@ -62,6 +68,8 @@ export default function App() {
             <Route path="/admin/ventas" element={<AdminVentas />} />
             <Route path="/admin/clientes" element={<AdminClientes />} />
             <Route path="/admin/historico" element={<AdminHistorico />} />
+            <Route path="/admin/cupones" element={<AdminCupones />} />
+            <Route path="/admin/promos" element={<AdminPromos />} />
           </Route>
         </Route>
 

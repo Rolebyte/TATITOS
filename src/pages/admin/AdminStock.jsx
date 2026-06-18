@@ -62,6 +62,8 @@ function ModalProducto({ producto, onClose, onGuardado }) {
   const [imagen, setImagen] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [preview, setPreview] = useState(producto?.imagen_url || null)
+  const [imagenesExtra, setImagenesExtra] = useState(producto?.imagenes || [])
+  const [urlInput, setUrlInput] = useState('')
 
   const handleImagen = (e) => {
     const file = e.target.files[0]
@@ -96,6 +98,7 @@ function ModalProducto({ producto, onClose, onGuardado }) {
         categoria: form.categoria,
         marca: form.marca,
         imagen_url,
+        imagenes: imagenesExtra,
       }
 
       if (esEdicion) {
@@ -136,6 +139,47 @@ function ModalProducto({ producto, onClose, onGuardado }) {
               <span className="text-sm text-gray-500">{imagen ? imagen.name : preview ? 'Cambiar imagen...' : 'Subir imagen...'}</span>
               <input type="file" accept="image/*" className="hidden" onChange={handleImagen} />
             </label>
+          </div>
+
+          {/* Imágenes extra de galería */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Imágenes adicionales (galería)</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && urlInput.trim()) {
+                    e.preventDefault()
+                    setImagenesExtra([...imagenesExtra, urlInput.trim()])
+                    setUrlInput('')
+                  }
+                }}
+                placeholder="https://... (Enter para agregar)"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                type="button"
+                onClick={() => { if (urlInput.trim()) { setImagenesExtra([...imagenesExtra, urlInput.trim()]); setUrlInput('') } }}
+                className="px-3 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-pink-500"
+              >
+                +
+              </button>
+            </div>
+            {imagenesExtra.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {imagenesExtra.map((url, i) => (
+                  <div key={i} className="relative group">
+                    <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                    <button
+                      type="button"
+                      onClick={() => setImagenesExtra(imagenesExtra.filter((_, j) => j !== i))}
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

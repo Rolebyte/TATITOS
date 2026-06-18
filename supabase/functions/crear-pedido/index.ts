@@ -33,7 +33,7 @@ serve(async (req) => {
   }
 
   try {
-    const { cliente, items, tipo_entrega, direccion, notas, costo_envio } = await req.json()
+    const { cliente, items, tipo_entrega, direccion, notas, costo_envio, cupon_codigo, descuento } = await req.json()
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -41,7 +41,8 @@ serve(async (req) => {
     )
 
     const subtotal = items.reduce((acc: number, i: any) => acc + i.precio * i.cantidad, 0)
-    const total = subtotal + (costo_envio || 0)
+    const descuentoFinal = Number(descuento) || 0
+    const total = subtotal - descuentoFinal + (costo_envio || 0)
 
     // Crear pedido en Supabase
     const { data: pedido, error: pedidoError } = await supabase
@@ -56,6 +57,8 @@ serve(async (req) => {
         notas,
         subtotal,
         costo_envio: costo_envio || 0,
+        descuento: descuentoFinal,
+        cupon_codigo: cupon_codigo || null,
         total,
         estado: 'pendiente',
       })
@@ -125,6 +128,11 @@ serve(async (req) => {
       .from('pedidos')
       .update({ mp_preference_id: mpData.id })
       .eq('id', pedido.id)
+
+    // Incrementar uso del cupón si se aplicó uno
+    if (cupon_codigo) {
+      await supabase.rpc('incrementar_uso_cupon', { p_codigo: cupon_codigo })
+    }
 
     // Notificación WhatsApp a los dueños via CallMeBot
     await notificarDuenos(pedido, items, tipo_entrega, total)
