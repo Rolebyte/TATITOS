@@ -1,9 +1,14 @@
+import { useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
+import useCarritoStore from '../store/carritoStore'
 
 export default function PagoExito() {
   const [params] = useSearchParams()
   const paymentId = params.get('payment_id')
+  const vaciarCarrito = useCarritoStore((s) => s.vaciarCarrito)
+
+  useEffect(() => { vaciarCarrito() }, [])
 
   return (
     <div className="min-h-screen bg-light flex items-center justify-center px-4">
