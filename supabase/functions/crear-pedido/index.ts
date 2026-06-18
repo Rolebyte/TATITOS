@@ -41,7 +41,25 @@ serve(async (req) => {
     )
 
     const subtotal = items.reduce((acc: number, i: any) => acc + i.precio * i.cantidad, 0)
-    const descuentoFinal = Number(descuento) || 0
+
+    // Validar que el cupón no haya sido usado por este email
+    let descuentoFinal = Number(descuento) || 0
+    let cuponValidado = cupon_codigo || null
+    if (cupon_codigo && cliente.email) {
+      const { data: usoAnterior } = await supabase
+        .from('pedidos')
+        .select('id')
+        .eq('cupon_codigo', cupon_codigo)
+        .eq('cliente_email', cliente.email)
+        .neq('estado', 'cancelado')
+        .limit(1)
+        .single()
+      if (usoAnterior) {
+        descuentoFinal = 0
+        cuponValidado = null
+      }
+    }
+
     const total = subtotal - descuentoFinal + (costo_envio || 0)
 
     // Crear pedido en Supabase
@@ -58,7 +76,7 @@ serve(async (req) => {
         subtotal,
         costo_envio: costo_envio || 0,
         descuento: descuentoFinal,
-        cupon_codigo: cupon_codigo || null,
+        cupon_codigo: cuponValidado,
         total,
         estado: 'pendiente',
       })
@@ -130,8 +148,8 @@ serve(async (req) => {
       .eq('id', pedido.id)
 
     // Incrementar uso del cupón si se aplicó uno
-    if (cupon_codigo) {
-      await supabase.rpc('incrementar_uso_cupon', { p_codigo: cupon_codigo })
+    if (cuponValidado) {
+      await supabase.rpc('incrementar_uso_cupon', { p_codigo: cuponValidado })
     }
 
     // Notificación WhatsApp a los dueños via CallMeBot
