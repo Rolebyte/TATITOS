@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Baby, Menu, X } from 'lucide-react'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -13,11 +14,24 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const handleAnchor = (anchor) => (e) => {
+    e.preventDefault()
+    setOpen(false)
+    if (location.pathname !== '/') {
+      navigate('/')
+      setTimeout(() => {
+        document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
+    } else {
+      document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   const links = [
-    { to: '/', label: 'Inicio' },
-    { to: '/tienda', label: 'Catálogo' },
-    { to: '/#nosotros', label: 'Nosotros' },
-    { to: '/#contacto', label: 'Contacto' },
+    { to: '/', label: 'Inicio', anchor: null },
+    { to: '/tienda', label: 'Catálogo', anchor: null },
+    { to: '/#nosotros', label: 'Nosotros', anchor: 'nosotros' },
+    { to: '/#contacto', label: 'Contacto', anchor: 'contacto' },
   ]
 
   return (
@@ -35,14 +49,24 @@ export default function Navbar() {
         <ul className="hidden md:flex items-center gap-6">
           {links.map((l) => (
             <li key={l.to}>
-              <Link
-                to={l.to}
-                className={`font-body font-medium text-sm hover:text-primary transition-colors ${
-                  location.pathname === l.to ? 'text-primary' : 'text-gray-600'
-                }`}
-              >
-                {l.label}
-              </Link>
+              {l.anchor ? (
+                <a
+                  href={l.to}
+                  onClick={handleAnchor(l.anchor)}
+                  className="font-body font-medium text-sm hover:text-primary transition-colors text-gray-600 cursor-pointer"
+                >
+                  {l.label}
+                </a>
+              ) : (
+                <Link
+                  to={l.to}
+                  className={`font-body font-medium text-sm hover:text-primary transition-colors ${
+                    location.pathname === l.to ? 'text-primary' : 'text-gray-600'
+                  }`}
+                >
+                  {l.label}
+                </Link>
+              )}
             </li>
           ))}
         </ul>
@@ -62,14 +86,25 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden bg-white border-t px-4 py-4 flex flex-col gap-4">
           {links.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className="font-medium text-gray-700 hover:text-primary"
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </Link>
+            l.anchor ? (
+              <a
+                key={l.to}
+                href={l.to}
+                onClick={handleAnchor(l.anchor)}
+                className="font-medium text-gray-700 hover:text-primary cursor-pointer"
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="font-medium text-gray-700 hover:text-primary"
+                onClick={() => setOpen(false)}
+              >
+                {l.label}
+              </Link>
+            )
           ))}
           <Link to="/tienda" className="btn-primary text-sm text-center" onClick={() => setOpen(false)}>
             Ver catálogo →
