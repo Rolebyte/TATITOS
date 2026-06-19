@@ -1,6 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+function formatPeso(n: number): string {
+  return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 async function notificarDuenos(pedido: any, items: any[], tipo_entrega: string, total: number) {
   const duenos = [
     { phone: '5493492627811', apikey: '5568416' },
@@ -10,14 +14,20 @@ async function notificarDuenos(pedido: any, items: any[], tipo_entrega: string, 
   const numeroFormateado = String(pedido.numero).padStart(4, '0')
   const itemsTexto = items.map((i: any) => `${i.nombre} x${i.cantidad}`).join(', ')
   const entregaTexto =
-    tipo_entrega === 'domicilio' ? '🏠 Envío a domicilio' :
-    tipo_entrega === 'localidad' ? '📦 Envío a localidad' : '🤝 Retiro'
+    tipo_entrega === 'domicilio' ? 'Envio a domicilio' :
+    tipo_entrega === 'localidad' ? 'Envio a localidad' : 'Retiro'
 
-  const mensaje = `🛍️ Nuevo pedido %23${numeroFormateado}%0A👤 ${encodeURIComponent(pedido.cliente_nombre)} · ${pedido.cliente_telefono}%0A📋 ${encodeURIComponent(itemsTexto)}%0A💰 Total: $${Number(total).toLocaleString('es-AR')}%0A${encodeURIComponent(entregaTexto)}`
+  const mensaje = [
+    `Nuevo pedido #${numeroFormateado}`,
+    `${pedido.cliente_nombre} - ${pedido.cliente_telefono}`,
+    itemsTexto,
+    `Total: ${formatPeso(total)}`,
+    entregaTexto,
+  ].join('\n')
 
   await Promise.allSettled(
     duenos.map(({ phone, apikey }) =>
-      fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${mensaje}&apikey=${apikey}`)
+      fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(mensaje)}&apikey=${apikey}`)
     )
   )
 }
@@ -41,26 +51,7 @@ serve(async (req) => {
     )
 
     const subtotal = items.reduce((acc: number, i: any) => acc + i.precio * i.cantidad, 0)
-
-    // Validar que el cupón no haya sido usado por este email
-    let descuentoFinal = Number(descuento) || 0
-    let cuponValidado = cupon_codigo || null
-    if (cupon_codigo && cliente.email) {
-      const { data: usoAnterior } = await supabase
-        .from('pedidos')
-        .select('id')
-        .eq('cupon_codigo', cupon_codigo)
-        .eq('cliente_email', cliente.email)
-        .neq('estado', 'cancelado')
-        .limit(1)
-        .single()
-      if (usoAnterior) {
-        descuentoFinal = 0
-        cuponValidado = null
-      }
-    }
-
-    const total = subtotal - descuentoFinal + (costo_envio || 0)
+    const total = subtotal + (costo_envio || 0)
 
     // Crear pedido en Supabase
     const { data: pedido, error: pedidoError } = await supabase
@@ -75,9 +66,9 @@ serve(async (req) => {
         notas,
         subtotal,
         costo_envio: costo_envio || 0,
-        descuento: descuentoFinal,
-        cupon_codigo: cuponValidado,
         total,
+        cupon_codigo: cupon_codigo || null,
+        descuento: descuento || 0,
         estado: 'pendiente',
       })
       .select()
@@ -146,11 +137,6 @@ serve(async (req) => {
       .from('pedidos')
       .update({ mp_preference_id: mpData.id })
       .eq('id', pedido.id)
-
-    // Incrementar uso del cupón si se aplicó uno
-    if (cuponValidado) {
-      await supabase.rpc('incrementar_uso_cupon', { p_codigo: cuponValidado })
-    }
 
     // Notificación WhatsApp a los dueños via CallMeBot
     await notificarDuenos(pedido, items, tipo_entrega, total)

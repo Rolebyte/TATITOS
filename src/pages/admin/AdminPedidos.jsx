@@ -141,12 +141,29 @@ export default function AdminPedidos() {
     setLoading(false)
   }
 
+  const MENSAJES_ESTADO = {
+    confirmado: (nombre, num) => `Hola ${nombre}! 👋 Tu pedido *#${num}* fue confirmado. Ya lo estamos preparando con mucho cariño 💛`,
+    preparando: (nombre, num) => `Hola ${nombre}! 📦 Tu pedido *#${num}* está siendo preparado y pronto estará listo.`,
+    enviado: (nombre, num) => `Hola ${nombre}! 🚚 Tu pedido *#${num}* ya está en camino. ¡Pronto llegará a tus manos!`,
+    entregado: (nombre, num) => `Hola ${nombre}! ✅ Tu pedido *#${num}* fue entregado. Gracias por elegirnos, esperamos que todo llegue perfecto 💛`,
+    cancelado: (nombre, num) => `Hola ${nombre}. Tu pedido *#${num}* fue cancelado. Comunicate con nosotros para más info.`,
+  }
+
   async function cambiarEstado(id, estado) {
     try {
+      const pedidoActual = pedidos.find((p) => p.id === id)
       const { error } = await supabase.from('pedidos').update({ estado }).eq('id', id)
       if (error) throw error
       setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, estado } : p)))
       toast.success('Estado actualizado')
+
+      const generarMensaje = MENSAJES_ESTADO[estado]
+      if (generarMensaje && pedidoActual) {
+        const num = String(pedidoActual.numero).padStart(4, '0')
+        const texto = generarMensaje(pedidoActual.cliente_nombre, num)
+        const tel = pedidoActual.cliente_telefono?.replace(/\D/g, '')
+        window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(texto)}`, '_blank')
+      }
     } catch {
       toast.error('Error al actualizar')
     }
