@@ -142,11 +142,11 @@ export default function AdminPedidos() {
   }
 
   const MENSAJES_ESTADO = {
-    confirmado: (nombre, num) => `Hola ${nombre}! 👋 Tu pedido *#${num}* fue confirmado. Ya lo estamos preparando con mucho cariño 💛`,
-    preparando: (nombre, num) => `Hola ${nombre}! 📦 Tu pedido *#${num}* está siendo preparado y pronto estará listo.`,
-    enviado: (nombre, num) => `Hola ${nombre}! 🚚 Tu pedido *#${num}* ya está en camino. ¡Pronto llegará a tus manos!`,
-    entregado: (nombre, num) => `Hola ${nombre}! ✅ Tu pedido *#${num}* fue entregado. Gracias por elegirnos, esperamos que todo llegue perfecto 💛`,
-    cancelado: (nombre, num) => `Hola ${nombre}. Tu pedido *#${num}* fue cancelado. Comunicate con nosotros para más info.`,
+    confirmado: (nombre, num) => `Hola ${nombre}! \u{1F44B} Tu pedido *#${num}* fue confirmado. Ya lo estamos preparando con mucho cari\u{00F1}o \u{1F49B}`,
+    preparando: (nombre, num) => `Hola ${nombre}! \u{1F4E6} Tu pedido *#${num}* est\u{00E1} siendo preparado y pronto estar\u{00E1} listo.`,
+    enviado: (nombre, num) => `Hola ${nombre}! \u{1F69A} Tu pedido *#${num}* ya est\u{00E1} en camino. \u{00A1}Pronto llegar\u{00E1} a tus manos!`,
+    entregado: (nombre, num) => `Hola ${nombre}! \u{2705} Tu pedido *#${num}* fue entregado. Gracias por elegirnos, esperamos que todo llegue perfecto \u{1F49B}`,
+    cancelado: (nombre, num) => `Hola ${nombre}. Tu pedido *#${num}* fue cancelado. Comunicate con nosotros para m\u{00E1}s info.`,
   }
 
   async function cambiarEstado(id, estado) {
