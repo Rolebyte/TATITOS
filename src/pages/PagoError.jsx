@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { XCircle } from 'lucide-react'
+import useSEO from '../hooks/useSEO'
 
 export default function PagoError() {
+  useSEO({ titulo: 'Error en el pago', descripcion: 'Hubo un problema con tu pago. Tatitos Panalera.' })
   return (
     <div className="min-h-screen bg-light flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">

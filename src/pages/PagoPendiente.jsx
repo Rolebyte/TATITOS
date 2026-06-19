@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { Clock } from 'lucide-react'
+import useSEO from '../hooks/useSEO'
 
 export default function PagoPendiente() {
+  useSEO({ titulo: 'Pago pendiente', descripcion: 'Tu pago esta siendo procesado. Tatitos Panalera.' })
   return (
     <div className="min-h-screen bg-light flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">

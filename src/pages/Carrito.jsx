@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Minus, Plus, Trash2, ArrowLeft, ShoppingBag, Home, MapPin, Store, Tag, X, MessageCircle, Zap, AlertTriangle, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
+import useSEO from '../hooks/useSEO'
 import useCarritoStore from '../store/carritoStore'
 import { PROVINCIAS } from '../data/provincias'
 import { supabase } from '../lib/supabase'
@@ -40,6 +41,7 @@ function datosCompletos(d) {
 }
 
 export default function Carrito() {
+  useSEO({ titulo: 'Mi carrito', descripcion: 'Revisá tu carrito de compras en Tatitos Pañalera.', url: '/tienda/carrito' })
   const { items, quitarItem, cambiarCantidad, vaciarCarrito, restaurarItems, generarCarritoId, carritoId } = useCarritoStore()
   const subtotal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
   const [searchParams] = useSearchParams()
