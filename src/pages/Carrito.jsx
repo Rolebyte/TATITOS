@@ -8,7 +8,7 @@ import useCarritoStore from '../store/carritoStore'
 import { PROVINCIAS } from '../data/provincias'
 import { supabase } from '../lib/supabase'
 
-const COSTO_ENVIO_LOCAL = 2500
+const COSTO_ENVIO_LOCAL = 3500
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492000000'
 
 function validarTelefono(tel) {
@@ -408,11 +408,12 @@ export default function Carrito() {
                 </div>
               )}
               <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Envío</span><span className="text-muted">Se calcula en el siguiente paso</span>
+                <span>Envío a domicilio en Rafaela</span>
+                <span className="text-muted">+${COSTO_ENVIO_LOCAL.toLocaleString('es-AR')}</span>
               </div>
               <div className="flex justify-between font-display font-bold text-lg border-t pt-2">
-                <span>Total</span>
-                <span className="text-primary">${(subtotal - descuento).toLocaleString('es-AR')}+</span>
+                <span>Total estimado</span>
+                <span className="text-primary">${(subtotal - descuento + COSTO_ENVIO_LOCAL).toLocaleString('es-AR')}</span>
               </div>
             </div>
 
