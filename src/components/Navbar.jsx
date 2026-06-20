@@ -21,7 +21,7 @@ export default function Navbar() {
       navigate('/')
       setTimeout(() => {
         document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' })
-      }, 300)
+      }, 100)
     } else {
       document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' })
     }
@@ -30,6 +30,7 @@ export default function Navbar() {
   const links = [
     { to: '/', label: 'Inicio', anchor: null },
     { to: '/tienda', label: 'Catálogo', anchor: null },
+    { to: '/mis-pedidos', label: 'Mis pedidos', anchor: null },
     { to: '/#nosotros', label: 'Nosotros', anchor: 'nosotros' },
     { to: '/#contacto', label: 'Contacto', anchor: 'contacto' },
   ]
