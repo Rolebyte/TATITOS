@@ -34,6 +34,8 @@ const categorias = [
   { label: 'Limpieza e higiene', slug: 'limpieza', icon: SprayCan, color: 'bg-green-50 text-green-500' },
 ]
 
+const marcas = ['Pampers', 'Huggies', "Johnson's", 'Pequeñín', 'Bepanthen', 'Suavitel', 'Skip']
+
 const DESTACADOS_DEMO = [
   { id: '1', nombre: 'Pampers Etapas T2 x40', precio: 5850, stock: 18, categoria: 'pañales', marca: 'Pampers', imagen_url: null },
   { id: '6', nombre: 'Toallitas Pequeñín x80', precio: 2500, stock: 24, categoria: 'toallitas', marca: 'Pequeñín', imagen_url: null },
@@ -51,10 +53,9 @@ export default function Landing() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
   const [destacados, setDestacados] = useState([])
-  const [marcas, setMarcas] = useState([])
 
   useEffect(() => {
-    async function cargarDatos() {
+    async function cargarDestacados() {
       try {
         const { data, error } = await supabase
           .from('productos')
@@ -68,22 +69,8 @@ export default function Landing() {
       } catch {
         setDestacados(DESTACADOS_DEMO)
       }
-
-      try {
-        const { data } = await supabase
-          .from('productos')
-          .select('marca')
-          .eq('activo', true)
-          .not('marca', 'is', null)
-        if (data?.length) {
-          const unicas = [...new Set(data.map((p) => p.marca))].sort()
-          setMarcas(unicas)
-        }
-      } catch {
-        setMarcas(['Pampers', 'Huggies', "Johnson's", 'Pequeñín', 'Bepanthen', 'Suavitel', 'Skip'])
-      }
     }
-    cargarDatos()
+    cargarDestacados()
   }, [])
 
   const handleBuscar = (e) => {
@@ -102,7 +89,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 py-10 md:py-20 text-center">
           <img src="/logo2.png" alt="Tatitos Pañalera" className="w-[500px] max-w-full mx-auto mb-2 drop-shadow-md object-contain" />
           <h1 className="font-display text-3xl md:text-5xl font-black text-gray-900 leading-tight mb-4">
-            Todo lo que tu bebé necesita,{' '}
+            Pañalera online en Rafaela —{' '}
             <span className="text-primary">en la puerta de tu hogar</span>
           </h1>
           <p className="text-base text-muted max-w-xl mx-auto mb-10">
@@ -283,7 +270,7 @@ export default function Landing() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { num: '1+', label: 'Año de experiencia' },
-                { num: marcas.length || '14', label: 'Marcas disponibles' },
+                { num: '14', label: 'Marcas disponibles' },
                 { num: '100%', label: 'Envíos a todo el país' },
                 { num: '⭐', label: 'Atención personalizada' },
               ].map(({ num, label }) => (
@@ -363,7 +350,7 @@ export default function Landing() {
             Todo lo que tu bebé necesita, en un solo lugar
           </h2>
           <p className="text-pink-100 mb-8">
-            Más de {marcas.length || 14} marcas, precios accesibles y envíos a todo el país. Empezá a comprar hoy.
+            Más de 14 marcas, precios accesibles y envíos a todo el país. Empezá a comprar hoy.
           </p>
           <Link
             to="/tienda"
