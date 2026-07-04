@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 
 const COSTO_ENVIO_LOCAL = 3500
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492000000'
+const RECARGO_MP = 0.0642
 
 function validarTelefono(tel) {
   return /^[0-9]{10,12}$/.test(tel.replace(/[\s\-+]/g, ''))
@@ -49,7 +50,8 @@ export default function Carrito() {
 
   const [paso, setPaso] = useState(1)
   const [cargando, setCargando] = useState(false)
-  const [stockBajo, setStockBajo] = useState({}) // { _key: stockDisponible }
+  const [stockBajo, setStockBajo] = useState({})
+  const [metodoPago, setMetodoPago] = useState('efectivo')
 
   const [cuponInput, setCuponInput] = useState('')
   const [cuponAplicado, setCuponAplicado] = useState(null)
@@ -175,7 +177,9 @@ export default function Carrito() {
   })
 
   const ciudades = PROVINCIAS.find((p) => p.nombre === form.provincia)?.ciudades || []
-  const total = subtotal - descuento + costoEnvio(form)
+  const totalBase = subtotal - descuento + costoEnvio(form)
+  const recargoMP = metodoPago === 'mercadopago' ? Math.round(totalBase * RECARGO_MP) : 0
+  const total = totalBase + recargoMP
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -217,6 +221,7 @@ export default function Carrito() {
         costo_envio: costoEnvio(form),
         cupon_codigo: cuponAplicado?.codigo || null,
         descuento,
+        recargo_mp: recargoMP,
       }
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-pedido`, {
@@ -249,6 +254,8 @@ export default function Carrito() {
       ? `+$${COSTO_ENVIO_LOCAL.toLocaleString('es-AR')} de envío`
       : form.tipo_entrega === 'retiro' ? 'Retiro (sin costo)' : 'Envío a coordinar'
 
+    const labelMetodo = metodoPago === 'efectivo' ? 'Efectivo' : 'Transferencia bancaria'
+
     const mensaje = [
       '🛒 *Quiero hacer un pedido — Tatitos Pañalera*',
       '',
@@ -257,6 +264,7 @@ export default function Carrito() {
       lineaDescuento,
       '',
       `*Total: $${total.toLocaleString('es-AR')}* (${lineaEnvio})`,
+      `*Medio de pago: ${labelMetodo}*`,
       '',
       '*Mis datos:*',
       `Nombre: ${form.nombre}`,
@@ -571,7 +579,40 @@ export default function Carrito() {
               <button onClick={() => setPaso(2)} className="text-xs text-primary hover:underline mt-2">Editar datos</button>
             </div>
 
-            <div className="card p-5 mb-6">
+            {/* Selector de medio de pago */}
+            <div className="card p-5 mb-4">
+              <h3 className="font-display font-bold text-gray-800 mb-3">Medio de pago</h3>
+              <div className="space-y-2">
+                {[
+                  { value: 'efectivo', label: 'Efectivo', sub: 'Pagás al recibir o al retirar', icon: '💵' },
+                  { value: 'transferencia', label: 'Transferencia bancaria', sub: 'Te enviamos el CBU/alias por WhatsApp', icon: '🏦' },
+                  { value: 'mercadopago', label: 'Mercado Pago', sub: `Recargo del 6,42% por comisión de la plataforma`, icon: '💳', recargo: true },
+                ].map(({ value, label, sub, icon, recargo }) => (
+                  <label key={value} className={`border-2 rounded-xl p-3.5 cursor-pointer flex items-start gap-3 transition-colors ${
+                    metodoPago === value ? 'border-primary bg-pink-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="metodoPago" value={value}
+                      checked={metodoPago === value} onChange={() => setMetodoPago(value)}
+                      className="accent-primary mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span>{icon}</span>
+                        <span className="font-display font-bold text-sm text-gray-900">{label}</span>
+                        {recargo && (
+                          <span className="ml-auto text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
+                            +6,42%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted mt-0.5 ml-6">{sub}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Resumen de totales */}
+            <div className="card p-5 mb-4">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>Subtotal</span><span>${subtotal.toLocaleString('es-AR')}</span>
               </div>
@@ -581,7 +622,7 @@ export default function Carrito() {
                   <span>-${descuento.toLocaleString('es-AR')}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>Envío</span>
                 <span>
                   {form.tipo_entrega === 'domicilio' && `$${COSTO_ENVIO_LOCAL.toLocaleString('es-AR')}`}
@@ -589,6 +630,12 @@ export default function Carrito() {
                   {form.tipo_entrega === 'retiro' && <span className="text-green-600 font-semibold">Gratis</span>}
                 </span>
               </div>
+              {metodoPago === 'mercadopago' && (
+                <div className="flex justify-between text-sm text-orange-600 font-semibold mb-1">
+                  <span>Recargo Mercado Pago (6,42%)</span>
+                  <span>+${recargoMP.toLocaleString('es-AR')}</span>
+                </div>
+              )}
               <div className="flex justify-between font-display font-black text-xl border-t pt-2">
                 <span>Total</span>
                 <span className="text-primary">
@@ -596,26 +643,38 @@ export default function Carrito() {
                   {form.tipo_entrega === 'localidad' && <span className="text-sm font-normal text-muted"> + envío</span>}
                 </span>
               </div>
+              {metodoPago === 'mercadopago' && (
+                <p className="text-xs text-muted mt-2 text-right">
+                  En efectivo o transferencia pagarías{' '}
+                  <span className="font-semibold text-gray-700">${totalBase.toLocaleString('es-AR')}</span>
+                </p>
+              )}
             </div>
 
             {form.tipo_entrega === 'localidad' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5 text-sm text-blue-700">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 text-sm text-blue-700">
                 📦 Te contactaremos por WhatsApp para coordinar el costo y método de envío a {form.ciudad}.
               </div>
             )}
 
-            {/* Botón MercadoPago */}
-            <button onClick={handlePagar} disabled={cargando}
-              className="w-full bg-[#009EE3] text-white font-display font-bold py-4 rounded-full text-base hover:bg-[#0087c5] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mb-3">
-              {cargando ? 'Procesando...' : '💳 Pagar con Mercado Pago'}
-            </button>
-
-            {/* Botón WhatsApp */}
-            <button onClick={handleWhatsApp}
-              className="w-full bg-[#25D366] text-white font-display font-bold py-4 rounded-full text-base hover:bg-[#20b958] transition-colors flex items-center justify-center gap-2">
-              <MessageCircle size={20} /> Pedir por WhatsApp
-            </button>
-            <p className="text-center text-xs text-muted mt-3">Coordinamos el pago directamente por chat</p>
+            {/* Botones de pago según método elegido */}
+            {metodoPago === 'mercadopago' ? (
+              <button onClick={handlePagar} disabled={cargando}
+                className="w-full bg-[#009EE3] text-white font-display font-bold py-4 rounded-full text-base hover:bg-[#0087c5] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                {cargando ? 'Procesando...' : `💳 Pagar $${total.toLocaleString('es-AR')} con Mercado Pago`}
+              </button>
+            ) : (
+              <button onClick={handleWhatsApp}
+                className="w-full bg-[#25D366] text-white font-display font-bold py-4 rounded-full text-base hover:bg-[#20b958] transition-colors flex items-center justify-center gap-2">
+                <MessageCircle size={20} />
+                {metodoPago === 'efectivo' ? `Pedir por WhatsApp — $${total.toLocaleString('es-AR')} en efectivo` : `Pedir por WhatsApp — $${total.toLocaleString('es-AR')} por transferencia`}
+              </button>
+            )}
+            <p className="text-center text-xs text-muted mt-3">
+              {metodoPago === 'mercadopago'
+                ? 'Serás redirigido al portal seguro de Mercado Pago'
+                : 'Te contactamos por WhatsApp para coordinar el pago'}
+            </p>
 
             <button onClick={() => setPaso(2)} className="flex items-center gap-1 text-sm text-muted mt-4 hover:text-primary mx-auto">
               <ArrowLeft size={14} /> Volver a datos
