@@ -2,57 +2,67 @@ import { useState, useEffect, useRef } from 'react'
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { ScanLine, Camera, CameraOff, Plus, Minus, Check, Search, X, Package, Link } from 'lucide-react'
+import { ScanLine, Camera, CameraOff, Plus, Minus, Check, Search, X, Package, ChevronRight, ArrowLeft } from 'lucide-react'
 
-const OFF_URL = 'https://world.openfoodfacts.org/api/v0/product'
-
-async function buscarEnOpenFoodFacts(ean) {
+async function fetchImagenOFF(ean) {
   try {
-    const res = await fetch(`${OFF_URL}/${ean}.json`)
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`)
     const json = await res.json()
     if (json.status !== 1) return null
     const p = json.product
-    return {
-      nombre: p.product_name_es || p.product_name || '',
-      marca:  p.brands?.split(',')[0]?.trim() || '',
-      imagen_url: p.image_front_small_url || p.image_url || null,
-    }
+    return p.image_front_small_url || p.image_url || null
   } catch {
     return null
   }
 }
 
+const FASE = { ESCANEAR: 'escanear', BUSCAR: 'buscar', CONFIRMAR: 'confirmar' }
+
 export default function AdminEscaner() {
   const videoRef = useRef(null)
   const readerRef = useRef(null)
+  const busquedaRef = useRef(null)
+
+  const [fase, setFase] = useState(FASE.ESCANEAR)
   const [escaneando, setEscaneando] = useState(false)
   const [eanManual, setEanManual] = useState('')
-  const [buscando, setBuscando] = useState(false)
-  const [resultado, setResultado] = useState(null)
+
+  // Fase BUSCAR
+  const [eanCapturado, setEanCapturado] = useState('')
+  const [imagenOff, setImagenOff] = useState(null)
+  const [cargandoImagen, setCargandoImagen] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [todosLosProductos, setTodosLosProductos] = useState([])
+  const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
+
+  // Fase CONFIRMAR
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null) // null = no está en DB
+  const [nombreManual, setNombreManual] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [proveedor, setProveedor] = useState('')
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [exito, setExito] = useState(false)
 
-  // Selector manual de producto
-  const [busquedaManual, setBusquedaManual] = useState('')
-  const [todosLosProductos, setTodosLosProductos] = useState([])
-  const [productoManualSeleccionado, setProductoManualSeleccionado] = useState(null)
-
   useEffect(() => { return () => pararEscaner() }, [])
 
-  // Cargar todos los productos al montar (para selector rápido)
   useEffect(() => {
     supabase.from('productos').select('id, nombre, marca, stock, precio, imagen_url, ean, categoria')
       .eq('activo', true).order('nombre')
       .then(({ data }) => setTodosLosProductos(data || []))
   }, [])
 
-  const productosFiltered = busquedaManual.trim().length >= 1
+  // Auto-focus en buscador al entrar a fase buscar
+  useEffect(() => {
+    if (fase === FASE.BUSCAR) {
+      setTimeout(() => busquedaRef.current?.focus(), 100)
+    }
+  }, [fase])
+
+  const productosFiltered = busqueda.trim().length >= 1
     ? todosLosProductos.filter((p) =>
-        p.nombre.toLowerCase().includes(busquedaManual.toLowerCase()) ||
-        (p.marca || '').toLowerCase().includes(busquedaManual.toLowerCase())
+        p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.marca || '').toLowerCase().includes(busqueda.toLowerCase())
       )
     : todosLosProductos
 
@@ -62,7 +72,10 @@ export default function AdminEscaner() {
       readerRef.current = reader
       setEscaneando(true)
       await reader.decodeFromVideoDevice(null, videoRef.current, (result, err) => {
-        if (result) { pararEscaner(); buscarProducto(result.getText()) }
+        if (result) {
+          pararEscaner()
+          entrarFaseBuscar(result.getText())
+        }
         if (err && !(err instanceof NotFoundException)) console.error(err)
       })
     } catch {
@@ -76,158 +89,106 @@ export default function AdminEscaner() {
     setEscaneando(false)
   }
 
-  async function buscarProducto(ean) {
+  async function entrarFaseBuscar(ean) {
     const eanLimpio = ean.trim()
     if (!eanLimpio) return
-    setBuscando(true)
-    setResultado(null)
-    setExito(false)
-    setCantidad(1)
-    setProductoManualSeleccionado(null)
-    setBusquedaManual('')
-    setProductosManual([])
 
-    try {
-      // 1) Buscar directamente en productos por EAN
-      const { data: prodDirecto } = await supabase
-        .from('productos')
-        .select('*')
-        .eq('activo', true)
-        .eq('ean', eanLimpio)
-        .maybeSingle()
+    setEanCapturado(eanLimpio)
+    setBusqueda('')
+    setImagenOff(null)
+    setProductoPreseleccionado(null)
+    setFase(FASE.BUSCAR)
 
-      if (prodDirecto) {
-        setResultado({
-          ean: eanLimpio,
-          nombre: prodDirecto.nombre,
-          marca: prodDirecto.marca || '',
-          imagen_url: prodDirecto.imagen_url,
-          productoExistente: prodDirecto,
-          fuente: 'productos',
-          necesitaBuscadorManual: false,
-        })
-        setBuscando(false)
-        return
-      }
+    // Buscar imagen en OFF en background
+    setCargandoImagen(true)
+    fetchImagenOFF(eanLimpio).then((img) => {
+      setImagenOff(img)
+      setCargandoImagen(false)
+    })
 
-      // 2) Buscar en catalogo_productos por EAN
-      const { data: cat } = await supabase
-        .from('catalogo_productos')
-        .select('*')
-        .eq('ean', eanLimpio)
-        .eq('activo', true)
-        .limit(1)
-        .maybeSingle()
+    // Verificar si el EAN ya está en la DB → pre-seleccionar
+    const { data: prodDirecto } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('activo', true)
+      .eq('ean', eanLimpio)
+      .maybeSingle()
 
-      if (cat) {
-        const nombreAuto = [cat.marca, cat.linea, cat.presentacion].filter(Boolean).join(' ')
-        const { data: prods } = await supabase
-          .from('productos')
-          .select('*')
-          .eq('activo', true)
-          .ilike('nombre', `%${cat.marca || ''}%`)
-          .limit(5)
-        setResultado({
-          ean: eanLimpio,
-          nombre: nombreAuto,
-          marca: cat.marca,
-          imagen_url: cat.imagen_url,
-          productoExistente: prods?.[0] || null,
-          fuente: 'catalogo',
-          necesitaBuscadorManual: !prods?.[0],
-        })
-        setBuscando(false)
-        return
-      }
-
-      // 3) Open Food Facts
-      const off = await buscarEnOpenFoodFacts(eanLimpio)
-      if (off && off.nombre) {
-        const { data: prods } = await supabase
-          .from('productos')
-          .select('*')
-          .eq('activo', true)
-          .ilike('nombre', `%${off.marca || off.nombre.split(' ')[0]}%`)
-          .limit(5)
-        setResultado({
-          ean: eanLimpio,
-          nombre: off.nombre,
-          marca: off.marca,
-          imagen_url: off.imagen_url,
-          productoExistente: prods?.[0] || null,
-          fuente: 'openfoodfacts',
-          necesitaBuscadorManual: !prods?.[0],
-        })
-        setBuscando(false)
-        return
-      }
-
-      // 4) No encontrado — mostrar buscador manual
-      setResultado({
-        ean: eanLimpio,
-        nombre: '',
-        marca: '',
-        imagen_url: null,
-        productoExistente: null,
-        fuente: 'manual',
-        necesitaBuscadorManual: true,
-      })
-    } catch {
-      toast.error('Error al buscar el producto')
+    if (prodDirecto) {
+      setProductoPreseleccionado(prodDirecto)
     }
-    setBuscando(false)
   }
 
-  function seleccionarProductoManual(prod) {
-    setProductoManualSeleccionado(prod)
-    setResultado(prev => ({ ...prev, productoExistente: prod, necesitaBuscadorManual: false }))
+  function seleccionarProducto(prod) {
+    setProductoSeleccionado(prod)
+    setNombreManual('')
+    setCantidad(1)
+    setProveedor('')
+    setNotas('')
+    setExito(false)
+    setFase(FASE.CONFIRMAR)
+  }
+
+  function seleccionarNoEsta() {
+    setProductoSeleccionado(null)
+    setNombreManual('')
+    setCantidad(1)
+    setProveedor('')
+    setNotas('')
+    setExito(false)
+    setFase(FASE.CONFIRMAR)
+  }
+
+  function resetear() {
+    pararEscaner()
+    setFase(FASE.ESCANEAR)
+    setEanCapturado('')
+    setImagenOff(null)
+    setBusqueda('')
+    setProductoPreseleccionado(null)
+    setProductoSeleccionado(null)
+    setNombreManual('')
+    setCantidad(1)
+    setProveedor('')
+    setNotas('')
+    setEanManual('')
+    setExito(false)
   }
 
   async function confirmarIngreso() {
-    if (!resultado) return
+    const nombreFinal = productoSeleccionado?.nombre || nombreManual.trim()
+    if (!nombreFinal) { toast.error('Ingresá el nombre del producto'); return }
+
     setGuardando(true)
     try {
-      const prod = resultado.productoExistente
-
-      if (prod) {
-        // Guardar EAN en el producto si no lo tenía (para reconocimiento futuro)
-        if (!prod.ean && resultado.ean) {
-          await supabase.from('productos').update({ stock: prod.stock + cantidad, ean: resultado.ean }).eq('id', prod.id)
-        } else {
-          await supabase.from('productos').update({ stock: prod.stock + cantidad }).eq('id', prod.id)
-        }
+      if (productoSeleccionado) {
+        const updates = { stock: productoSeleccionado.stock + cantidad }
+        if (!productoSeleccionado.ean && eanCapturado) updates.ean = eanCapturado
+        await supabase.from('productos').update(updates).eq('id', productoSeleccionado.id)
       }
 
       await supabase.from('ingresos_stock').insert({
-        producto_id: prod?.id || null,
-        nombre_producto: prod?.nombre || resultado.nombre || `EAN ${resultado.ean}`,
-        marca: prod?.marca || resultado.marca || null,
-        categoria: prod?.categoria || null,
+        producto_id: productoSeleccionado?.id || null,
+        nombre_producto: nombreFinal,
+        marca: productoSeleccionado?.marca || null,
+        categoria: productoSeleccionado?.categoria || null,
         cantidad,
-        precio_venta: prod?.precio || 0,
+        precio_venta: productoSeleccionado?.precio || 0,
         proveedor: proveedor.trim() || null,
         notas: notas.trim() || null,
-        ean: resultado.ean,
+        ean: eanCapturado || null,
       })
 
-      toast.success(prod
-        ? `+${cantidad} unidades agregadas a "${prod.nombre}"`
-        : 'Ingreso registrado sin producto vinculado')
-
+      toast.success(`+${cantidad} unidades agregadas${productoSeleccionado ? ` a "${productoSeleccionado.nombre}"` : ''}`)
       setExito(true)
-      setTimeout(() => {
-        setResultado(null); setExito(false); setCantidad(1)
-        setProveedor(''); setNotas(''); setEanManual('')
-        setProductoManualSeleccionado(null); setBusquedaManual('')
-        pararEscaner()
-      }, 2000)
+      setTimeout(resetear, 2000)
     } catch {
       toast.error('Error al guardar')
     }
     setGuardando(false)
   }
 
-  const prod = resultado?.productoExistente
+  const imagenProducto = productoSeleccionado?.imagen_url || imagenOff
 
   return (
     <div className="max-w-lg mx-auto">
@@ -236,64 +197,152 @@ export default function AdminEscaner() {
         <h1 className="font-display text-2xl font-bold text-gray-900">Escanear producto</h1>
       </div>
 
-      {/* Scanner */}
-      <div className="card overflow-hidden mb-4">
-        <div className="relative bg-gray-900 aspect-video flex items-center justify-center">
-          <video ref={videoRef} className={`w-full h-full object-cover ${escaneando ? 'block' : 'hidden'}`} />
-          {!escaneando && (
-            <div className="flex flex-col items-center gap-3 text-gray-500 py-10">
-              <Camera size={48} />
-              <p className="text-sm">Cámara apagada</p>
+      {/* ── FASE: ESCANEAR ── */}
+      {fase === FASE.ESCANEAR && (
+        <>
+          <div className="card overflow-hidden mb-4">
+            <div className="relative bg-gray-900 aspect-video flex items-center justify-center">
+              <video ref={videoRef} className={`w-full h-full object-cover ${escaneando ? 'block' : 'hidden'}`} />
+              {!escaneando && (
+                <div className="flex flex-col items-center gap-3 text-gray-500 py-10">
+                  <Camera size={48} />
+                  <p className="text-sm">Cámara apagada</p>
+                </div>
+              )}
+              {escaneando && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-56 h-32 border-2 border-primary rounded-lg opacity-70" />
+                </div>
+              )}
             </div>
-          )}
-          {escaneando && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-56 h-32 border-2 border-primary rounded-lg opacity-70" />
+            <div className="p-4 flex gap-3">
+              {!escaneando ? (
+                <button onClick={iniciarEscaner} className="flex-1 btn-primary justify-center gap-2">
+                  <Camera size={18} /> Activar cámara
+                </button>
+              ) : (
+                <button onClick={pararEscaner} className="flex-1 btn-secondary justify-center gap-2">
+                  <CameraOff size={18} /> Detener
+                </button>
+              )}
             </div>
-          )}
-        </div>
-        <div className="p-4 flex gap-3">
-          {!escaneando ? (
-            <button onClick={iniciarEscaner} className="flex-1 btn-primary justify-center gap-2">
-              <Camera size={18} /> Activar cámara
-            </button>
-          ) : (
-            <button onClick={pararEscaner} className="flex-1 btn-secondary justify-center gap-2">
-              <CameraOff size={18} /> Detener
-            </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Ingreso manual de EAN */}
-      <div className="card p-4 mb-4">
-        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">O ingresá el código manualmente</p>
-        <div className="flex gap-2">
-          <input
-            value={eanManual}
-            onChange={(e) => setEanManual(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && buscarProducto(eanManual)}
-            placeholder="Ej: 7790580018016"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <button
-            onClick={() => buscarProducto(eanManual)}
-            disabled={!eanManual.trim() || buscando}
-            className="btn-primary px-4 py-2 disabled:opacity-50"
-          >
-            <Search size={16} />
-          </button>
-        </div>
-      </div>
+          <div className="card p-4">
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">O ingresá el código manualmente</p>
+            <div className="flex gap-2">
+              <input
+                value={eanManual}
+                onChange={(e) => setEanManual(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && entrarFaseBuscar(eanManual)}
+                placeholder="Ej: 7790580018016"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                onClick={() => entrarFaseBuscar(eanManual)}
+                disabled={!eanManual.trim()}
+                className="btn-primary px-4 py-2 disabled:opacity-50"
+              >
+                <Search size={16} />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
-      {buscando && (
-        <div className="card p-8 text-center text-muted">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
-          Buscando producto...
+      {/* ── FASE: BUSCAR ── */}
+      {fase === FASE.BUSCAR && (
+        <div className="card overflow-hidden">
+          {/* EAN capturado */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <ScanLine size={16} className="text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted">EAN escaneado</p>
+              <p className="font-mono text-sm font-bold text-gray-800 truncate">{eanCapturado}</p>
+            </div>
+            <button onClick={resetear} className="text-gray-400 hover:text-gray-600 p-1">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-4">
+            {/* Si ya está en DB por EAN */}
+            {productoPreseleccionado && (
+              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
+                {productoPreseleccionado.imagen_url
+                  ? <img src={productoPreseleccionado.imagen_url} alt="" className="w-10 h-10 object-contain rounded-lg border border-white shrink-0" />
+                  : <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0"><Package size={16} className="text-green-400" /></div>
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-green-700 mb-0.5">Reconocido automáticamente</p>
+                  <p className="text-sm font-bold text-gray-900 truncate">{productoPreseleccionado.nombre}</p>
+                  <p className="text-xs text-green-600">Stock: {productoPreseleccionado.stock} ud.</p>
+                </div>
+                <button
+                  onClick={() => seleccionarProducto(productoPreseleccionado)}
+                  className="btn-primary px-3 py-1.5 text-sm shrink-0"
+                >
+                  Usar <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Buscador */}
+            <p className="text-xs font-semibold text-gray-600 mb-2">
+              {productoPreseleccionado ? 'O buscá otro producto:' : '¿A qué producto corresponde este código?'}
+            </p>
+            <div className="relative mb-3">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                ref={busquedaRef}
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Escribí el nombre del producto..."
+                className="w-full pl-8 pr-3 border border-gray-200 rounded-xl py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* Lista de productos */}
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-50 mb-3">
+              {productosFiltered.length === 0 && busqueda.trim() ? (
+                <p className="text-center py-4 text-xs text-muted">Sin resultados para "{busqueda}"</p>
+              ) : (
+                productosFiltered.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => seleccionarProducto(p)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-pink-50 text-left transition-colors"
+                  >
+                    {p.imagen_url
+                      ? <img src={p.imagen_url} alt="" className="w-9 h-9 object-contain rounded-lg shrink-0 border border-gray-100" />
+                      : <div className="w-9 h-9 bg-gray-100 rounded-lg shrink-0 flex items-center justify-center"><Package size={14} className="text-gray-300" /></div>
+                    }
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate leading-tight">{p.nombre}</p>
+                      <p className="text-xs text-muted">{p.marca ? `${p.marca} · ` : ''}{p.stock} ud. en stock</p>
+                    </div>
+                    {p.ean && <span className="text-xs font-medium text-green-500 shrink-0">EAN ✓</span>}
+                    <ChevronRight size={14} className="text-gray-300 shrink-0" />
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* No está en DB */}
+            <button
+              onClick={seleccionarNoEsta}
+              className="w-full text-center text-xs text-gray-400 hover:text-primary py-2 border border-dashed border-gray-200 hover:border-primary rounded-xl transition-colors"
+            >
+              No está en el catálogo — ingresar de todas formas
+            </button>
+          </div>
         </div>
       )}
 
-      {resultado && !buscando && (
+      {/* ── FASE: CONFIRMAR ── */}
+      {fase === FASE.CONFIRMAR && (
         <div className={`card overflow-hidden transition-all ${exito ? 'border-2 border-green-400' : ''}`}>
           {exito && (
             <div className="bg-green-50 py-3 flex items-center justify-center gap-2 text-green-700 font-semibold text-sm">
@@ -301,108 +350,61 @@ export default function AdminEscaner() {
             </div>
           )}
 
+          {/* Header producto */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b">
+            <button onClick={() => setFase(FASE.BUSCAR)} className="text-gray-400 hover:text-gray-700 p-1 -ml-1">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <ScanLine size={16} className="text-primary" />
+            </div>
+            <p className="font-mono text-xs text-muted truncate">{eanCapturado}</p>
+          </div>
+
           <div className="p-5">
-            {/* Header */}
-            <div className="flex gap-4 mb-4">
-              {resultado.imagen_url ? (
-                <img src={resultado.imagen_url} alt="" className="w-20 h-20 object-contain rounded-xl border border-gray-100 shrink-0" />
+            {/* Producto card */}
+            <div className="flex gap-4 mb-5">
+              {imagenProducto ? (
+                <img src={imagenProducto} alt="" className="w-20 h-20 object-contain rounded-xl border border-gray-100 shrink-0 bg-white" />
+              ) : cargandoImagen ? (
+                <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
               ) : (
                 <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
                   <Package size={32} className="text-gray-300" />
                 </div>
               )}
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-primary uppercase mb-0.5">
-                  {resultado.fuente === 'productos' ? 'Encontrado en tienda' :
-                   resultado.fuente === 'catalogo' ? 'Catálogo Tatitos' :
-                   resultado.fuente === 'openfoodfacts' ? 'Open Food Facts' : 'EAN escaneado'}
-                </p>
-                <p className="font-display font-bold text-gray-900 leading-tight">
-                  {resultado.nombre || <span className="text-gray-400 italic">Sin nombre externo</span>}
-                </p>
-                {resultado.marca && <p className="text-sm text-muted mt-0.5">{resultado.marca}</p>}
-                <p className="text-xs text-gray-400 mt-1 font-mono">EAN: {resultado.ean}</p>
-              </div>
-            </div>
-
-            {/* Producto vinculado o buscador manual */}
-            {prod && !resultado.necesitaBuscadorManual ? (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-green-700">
-                    {resultado.fuente === 'productos' ? 'Producto identificado' : 'Producto en tienda'}
-                  </p>
-                  <p className="text-sm text-gray-800 font-medium">{prod.nombre}</p>
-                  <p className="text-xs text-green-600">
-                    Stock actual: {prod.stock} ud.
-                    {prod.precio ? ` · $${prod.precio.toLocaleString('es-AR')}` : ''}
-                    {!prod.ean && resultado.ean ? ' · Se guardará el EAN al confirmar' : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {!prod.ean && resultado.ean && <Link size={14} className="text-green-500" />}
-                  <Check size={20} className="text-green-500 shrink-0" />
-                </div>
-              </div>
-            ) : (
-              <div className="mb-4">
-                {productoManualSeleccionado ? (
-                  <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-green-700">Producto seleccionado</p>
-                      <p className="text-sm text-gray-800 font-medium">{productoManualSeleccionado.nombre}</p>
-                      <p className="text-xs text-green-600">Stock: {productoManualSeleccionado.stock} ud. · EAN se guardará para próximas veces</p>
-                    </div>
-                    <button onClick={() => { setProductoManualSeleccionado(null); setResultado(prev => ({ ...prev, productoExistente: null, necesitaBuscadorManual: true })) }}>
-                      <X size={16} className="text-green-400" />
-                    </button>
-                  </div>
+              <div className="min-w-0 flex-1">
+                {productoSeleccionado ? (
+                  <>
+                    <p className="text-xs font-semibold text-primary uppercase mb-0.5">Producto de la tienda</p>
+                    <p className="font-display font-bold text-gray-900 leading-tight">{productoSeleccionado.nombre}</p>
+                    {productoSeleccionado.marca && <p className="text-sm text-muted mt-0.5">{productoSeleccionado.marca}</p>}
+                    <p className="text-xs text-green-600 mt-1">Stock actual: {productoSeleccionado.stock} ud.</p>
+                    {!productoSeleccionado.ean && eanCapturado && (
+                      <p className="text-xs text-blue-500 mt-0.5">Se guardará el EAN al confirmar</p>
+                    )}
+                  </>
                 ) : (
                   <>
-                    <p className="text-xs font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2.5 mb-3">
-                      Tocá el producto que corresponde a este código
-                    </p>
-                    {/* Buscador rápido */}
-                    <div className="relative mb-2">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        value={busquedaManual}
-                        onChange={(e) => setBusquedaManual(e.target.value)}
-                        placeholder="Filtrar..."
-                        className="w-full pl-8 pr-3 border border-gray-200 rounded-xl py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
-                    </div>
-                    {/* Lista directa de productos */}
-                    <div className="max-h-56 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-50">
-                      {productosFiltered.length === 0 && (
-                        <p className="text-center py-4 text-xs text-muted">Sin resultados</p>
-                      )}
-                      {productosFiltered.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => seleccionarProductoManual(p)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-pink-50 text-left transition-colors"
-                        >
-                          {p.imagen_url
-                            ? <img src={p.imagen_url} alt="" className="w-9 h-9 object-contain rounded-lg shrink-0 border border-gray-100" />
-                            : <div className="w-9 h-9 bg-gray-100 rounded-lg shrink-0 flex items-center justify-center"><Package size={14} className="text-gray-300" /></div>
-                          }
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate leading-tight">{p.nombre}</p>
-                            <p className="text-xs text-muted">{p.marca} · {p.stock} ud.</p>
-                          </div>
-                          {p.ean && <span className="text-xs text-green-500 font-mono shrink-0">✓</span>}
-                        </button>
-                      ))}
-                    </div>
+                    <p className="text-xs font-semibold text-yellow-600 uppercase mb-1">Producto no vinculado</p>
+                    <input
+                      value={nombreManual}
+                      onChange={(e) => setNombreManual(e.target.value)}
+                      placeholder="Nombre del producto..."
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      autoFocus
+                    />
+                    <p className="text-xs text-muted mt-1">Solo se registrará el ingreso, sin afectar stock</p>
                   </>
                 )}
               </div>
-            )}
+            </div>
 
             {/* Cantidad */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-700 mb-2">Unidades que ingresan al stock</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-2">Unidades que ingresan</label>
               <div className="flex items-center gap-3">
                 <button onClick={() => setCantidad(Math.max(1, cantidad - 1))} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
                   <Minus size={16} />
@@ -416,9 +418,9 @@ export default function AdminEscaner() {
                 <button onClick={() => setCantidad(cantidad + 1)} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
                   <Plus size={16} />
                 </button>
-                <span className="text-sm text-muted">
-                  {prod ? `→ stock: ${prod.stock + cantidad} ud.` : 'unidades'}
-                </span>
+                {productoSeleccionado && (
+                  <span className="text-sm text-muted">→ {productoSeleccionado.stock + cantidad} ud.</span>
+                )}
               </div>
             </div>
 
@@ -437,15 +439,12 @@ export default function AdminEscaner() {
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => { setResultado(null); setEanManual(''); setProductoManualSeleccionado(null); setBusquedaManual(''); pararEscaner() }}
-                className="btn-secondary py-3 px-4"
-              >
+              <button onClick={resetear} className="btn-secondary py-3 px-4">
                 <X size={16} />
               </button>
               <button
                 onClick={confirmarIngreso}
-                disabled={guardando || exito}
+                disabled={guardando || exito || (!productoSeleccionado && !nombreManual.trim())}
                 className="flex-1 btn-primary justify-center py-3 disabled:opacity-60"
               >
                 {guardando ? 'Guardando...' : `Confirmar +${cantidad} unidades`}
