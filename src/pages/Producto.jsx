@@ -99,6 +99,21 @@ export default function Producto() {
     return () => { if (channel) supabase.removeChannel(channel) }
   }, [id])
 
+  const tieneVariantes = producto?.variantes?.length > 0
+  const precioActual = tieneVariantes && varianteSeleccionada
+    ? (varianteSeleccionada.precio ?? 0)
+    : (producto?.precio ?? 0)
+  const stockActual = tieneVariantes && varianteSeleccionada
+    ? (varianteSeleccionada.stock ?? 0)
+    : (producto?.stock ?? 0)
+  const sinStock = stockActual <= 0
+
+  const todasLasImagenes = [
+    producto?.imagen_url,
+    ...(producto?.imagenes || []),
+  ].filter(Boolean)
+  const [imagenActiva, setImagenActiva] = useState(0)
+
   const handleAvisoStock = async (e) => {
     e.preventDefault()
     if (!avisoNombre.trim() || !avisoTel.trim()) return
@@ -169,21 +184,6 @@ export default function Producto() {
     document.head.appendChild(script)
     return () => { document.getElementById('product-jsonld')?.remove() }
   }, [producto, precioActual, stockActual])
-
-  const todasLasImagenes = [
-    producto?.imagen_url,
-    ...(producto?.imagenes || []),
-  ].filter(Boolean)
-  const [imagenActiva, setImagenActiva] = useState(0)
-
-  const tieneVariantes = producto?.variantes?.length > 0
-  const precioActual = tieneVariantes && varianteSeleccionada
-    ? (varianteSeleccionada.precio ?? 0)
-    : (producto?.precio ?? 0)
-  const stockActual = tieneVariantes && varianteSeleccionada
-    ? (varianteSeleccionada.stock ?? 0)
-    : (producto?.stock ?? 0)
-  const sinStock = stockActual <= 0
 
   if (loading) {
     return (
