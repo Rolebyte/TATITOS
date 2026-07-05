@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Plus, Upload, X, Check, ToggleLeft, ToggleRight, Pencil, Trash2, Bell } from 'lucide-react'
+import { Plus, Upload, X, Check, ToggleLeft, ToggleRight, Pencil, Trash2, Bell, Zap } from 'lucide-react'
 
 const CATEGORIAS = ['pañales', 'pañales adultos', 'toallitas', 'cremas', 'higiene', 'ropa', 'regaleria', 'limpieza', 'puericultura', 'perfumería', 'juguetes']
 
@@ -555,14 +555,73 @@ export default function AdminStock() {
     !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || (p.marca || '').toLowerCase().includes(busqueda.toLowerCase())
   )
 
+  const [autoEanCargando, setAutoEanCargando] = useState(false)
+  const [autoEanResultado, setAutoEanResultado] = useState(null)
+
+  async function autoCargarEans() {
+    const sinEan = productos.filter((p) => !p.ean)
+    if (sinEan.length === 0) { toast.success('Todos los productos ya tienen EAN'); return }
+    setAutoEanCargando(true)
+    setAutoEanResultado(null)
+    let encontrados = 0
+    let noEncontrados = 0
+
+    for (const prod of sinEan) {
+      try {
+        const query = encodeURIComponent(`${prod.marca || ''} ${prod.nombre}`.trim())
+        const res = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${query}&search_simple=1&action=process&json=1&page_size=5&tagtype_0=countries&tag_contains_0=contains&tag_0=ar`
+        )
+        const json = await res.json()
+        const match = json.products?.find((p) => p.code && p.product_name)
+        if (match?.code) {
+          await supabase.from('productos').update({ ean: match.code }).eq('id', prod.id)
+          setProductos((prev) => prev.map((p) => p.id === prod.id ? { ...p, ean: match.code } : p))
+          encontrados++
+        } else {
+          noEncontrados++
+        }
+      } catch {
+        noEncontrados++
+      }
+      // pequeña pausa para no saturar la API
+      await new Promise((r) => setTimeout(r, 300))
+    }
+
+    setAutoEanCargando(false)
+    setAutoEanResultado({ encontrados, noEncontrados })
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display text-2xl font-bold text-gray-900">Stock</h1>
-        <button onClick={() => setModal(null)} className="btn-primary text-sm py-2">
-          <Plus size={16} /> Agregar producto
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={autoCargarEans}
+            disabled={autoEanCargando}
+            className="btn-secondary text-sm py-2 disabled:opacity-60"
+            title="Busca y carga automáticamente los códigos EAN de todos los productos sin código"
+          >
+            <Zap size={16} /> {autoEanCargando ? 'Cargando EANs...' : 'Auto EAN'}
+          </button>
+          <button onClick={() => setModal(null)} className="btn-primary text-sm py-2">
+            <Plus size={16} /> Agregar producto
+          </button>
+        </div>
       </div>
+
+      {autoEanResultado && (
+        <div className="card p-4 mb-4 flex items-center justify-between">
+          <p className="text-sm text-gray-700">
+            EANs cargados: <span className="font-bold text-green-600">{autoEanResultado.encontrados}</span>
+            {autoEanResultado.noEncontrados > 0 && (
+              <span className="ml-2 text-muted">· {autoEanResultado.noEncontrados} sin resultado en Open Food Facts</span>
+            )}
+          </p>
+          <button onClick={() => setAutoEanResultado(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        </div>
+      )}
 
       {/* Avisos de stock */}
       {avisos.length > 0 && (
