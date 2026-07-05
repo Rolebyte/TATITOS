@@ -14,7 +14,7 @@ const STOCK_DEMO = [
 
 const TALLES = ['RN Prematuro', 'RN', 'RN+', 'P', 'T2', 'T3', 'M', 'T4', 'G', 'T5', 'XG', 'XXG', 'XXXG']
 
-const FORM_EMPTY = { nombre: '', precio: '', stock: '', categoria: 'pañales', marca: '', descripcion: '', talle: '', cantidad_unidades: '' }
+const FORM_EMPTY = { nombre: '', precio: '', stock: '', categoria: 'pañales', marca: '', descripcion: '', talle: '', cantidad_unidades: '', badges: [] }
 
 function stockColor(stock) {
   if (stock <= 0) return 'bg-red-100 text-red-600'
@@ -58,7 +58,7 @@ function ModalProducto({ producto, onClose, onGuardado }) {
   const esEdicion = !!producto
   const [form, setForm] = useState(
     esEdicion
-      ? { nombre: producto.nombre, precio: producto.precio, stock: producto.stock, categoria: producto.categoria, marca: producto.marca || '', descripcion: producto.descripcion || '', talle: producto.talle || '', cantidad_unidades: producto.cantidad_unidades || '' }
+      ? { nombre: producto.nombre, precio: producto.precio, stock: producto.stock, categoria: producto.categoria, marca: producto.marca || '', descripcion: producto.descripcion || '', talle: producto.talle || '', cantidad_unidades: producto.cantidad_unidades || '', badges: producto.badges || [] }
       : FORM_EMPTY
   )
   const [catalogoTodo, setCatalogoTodo] = useState([])
@@ -154,6 +154,7 @@ function ModalProducto({ producto, onClose, onGuardado }) {
         imagenes: imagenesExtra,
         talle: form.talle || null,
         cantidad_unidades: form.cantidad_unidades ? Number(form.cantidad_unidades) : null,
+        badges: form.badges || [],
       }
 
       if (esEdicion) {
@@ -402,6 +403,30 @@ function ModalProducto({ producto, onClose, onGuardado }) {
             <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               placeholder="Descripción del producto..." rows={2}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">Badges</label>
+            <div className="flex flex-wrap gap-2">
+              {['Oferta', 'Nuevo', 'Destacado', 'Más vendido', 'Exclusivo'].map((b) => {
+                const activo = (form.badges || []).includes(b)
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => {
+                      const prev = form.badges || []
+                      setForm({ ...form, badges: activo ? prev.filter((x) => x !== b) : [...prev, b] })
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold border-2 transition-colors ${
+                      activo ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:border-primary hover:text-primary'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

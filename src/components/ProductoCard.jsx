@@ -30,8 +30,16 @@ export default function ProductoCard({ producto }) {
     abrirCarrito()
   }
 
-  // Stock para badge (sin variantes)
   const stockBadge = tieneVariantes ? null : producto.stock
+
+  const BADGE_STYLES = {
+    'Oferta':      'bg-red-500 text-white',
+    'Nuevo':       'bg-green-500 text-white',
+    'Destacado':   'bg-amber-400 text-amber-900',
+    'Más vendido': 'bg-blue-500 text-white',
+    'Exclusivo':   'bg-purple-500 text-white',
+  }
+  const badgesCustom = Array.isArray(producto.badges) ? producto.badges.filter(Boolean) : []
 
   return (
     <Link to={`/tienda/producto/${producto.id}`} className="card overflow-hidden flex flex-col group">
@@ -54,6 +62,7 @@ export default function ProductoCard({ producto }) {
           </span>
         </div>
 
+        {/* Badges izquierda — stock automático */}
         {!tieneVariantes && sinStock && (
           <span className="absolute top-2 left-2 text-xs font-bold px-2.5 py-1 rounded-full bg-red-500 text-white shadow-sm">
             Sin stock
@@ -68,6 +77,20 @@ export default function ProductoCard({ producto }) {
           <span className="absolute top-2 left-2 text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-white shadow-sm">
             {producto.variantes.length} talles
           </span>
+        )}
+
+        {/* Badges derecha — personalizables desde admin */}
+        {badgesCustom.length > 0 && (
+          <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+            {badgesCustom.map((b) => (
+              <span
+                key={b}
+                className={`text-xs font-bold px-2.5 py-1 rounded-full shadow-sm ${BADGE_STYLES[b] || 'bg-gray-700 text-white'}`}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
