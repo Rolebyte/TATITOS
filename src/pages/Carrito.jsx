@@ -12,6 +12,46 @@ const COSTO_ENVIO_LOCAL = 3500
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'
 const RECARGO_MP = 0.0642
 
+// Horarios de Puni (hora local Rafaela = America/Argentina/Buenos_Aires)
+const HORARIOS_PUNI = {
+  0: [{ desde: 10*60, hasta: 15*60 }, { desde: 19*60, hasta: 23*60 }], // domingo
+  1: [{ desde:  8*60, hasta: 14*60 }, { desde: 16*60+30, hasta: 23*60 }], // lunes
+  2: [{ desde:  8*60, hasta: 14*60 }, { desde: 16*60+30, hasta: 23*60 }],
+  3: [{ desde:  8*60, hasta: 14*60 }, { desde: 16*60+30, hasta: 23*60 }],
+  4: [{ desde:  8*60, hasta: 14*60 }, { desde: 16*60+30, hasta: 23*60 }],
+  5: [{ desde:  8*60, hasta: 14*60 }, { desde: 16*60+30, hasta: 23*60+30 }], // viernes
+  6: [{ desde:  9*60, hasta: 14*60 }, { desde: 19*60, hasta: 23*60+30 }], // sábado
+}
+
+function estadoPuni() {
+  const ahora = new Date()
+  const dia = ahora.getDay()
+  const minutos = ahora.getHours() * 60 + ahora.getMinutes()
+  const turnos = HORARIOS_PUNI[dia]
+
+  // ¿Está operando ahora?
+  for (const t of turnos) {
+    if (minutos >= t.desde && minutos < t.hasta) {
+      const cierra = `${String(Math.floor(t.hasta / 60)).padStart(2,'0')}:${String(t.hasta % 60).padStart(2,'0')}`
+      return { activo: true, mensaje: `🛵 Puni opera ahora — entrega hasta las ${cierra}hs` }
+    }
+  }
+
+  // ¿Próximo turno hoy?
+  const proximoHoy = turnos.find(t => t.desde > minutos)
+  if (proximoHoy) {
+    const abre = `${String(Math.floor(proximoHoy.desde / 60)).padStart(2,'0')}:${String(proximoHoy.desde % 60).padStart(2,'0')}`
+    return { activo: false, mensaje: `🕐 Próximo turno hoy a las ${abre}hs` }
+  }
+
+  // Próximo turno mañana
+  const diaSig = (dia + 1) % 7
+  const diasNombre = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
+  const primerTurno = HORARIOS_PUNI[diaSig][0]
+  const abre = `${String(Math.floor(primerTurno.desde / 60)).padStart(2,'0')}:${String(primerTurno.desde % 60).padStart(2,'0')}`
+  return { activo: false, mensaje: `🕐 Puni retoma el ${diasNombre[diaSig]} a las ${abre}hs` }
+}
+
 function validarTelefono(tel) {
   return /^[0-9]{10,12}$/.test(tel.replace(/[\s\-+]/g, ''))
 }
@@ -477,6 +517,14 @@ export default function Carrito() {
                         <span className="ml-auto text-sm font-bold text-primary shrink-0">+${COSTO_ENVIO_LOCAL.toLocaleString('es-AR')}</span>
                       </div>
                       <p className="text-xs text-muted mt-0.5">Solo dentro de Rafaela · ¡Nosotros te lo llevamos! 😊</p>
+                      {(() => {
+                        const puni = estadoPuni()
+                        return (
+                          <p className={`text-xs font-medium mt-1.5 ${puni.activo ? 'text-green-600' : 'text-amber-600'}`}>
+                            {puni.mensaje}
+                          </p>
+                        )
+                      })()}
                       {form.tipo_entrega === 'domicilio' && (
                         <input name="direccion" value={form.direccion} onChange={handleChange}
                           placeholder="Calle, número, piso, depto..."
