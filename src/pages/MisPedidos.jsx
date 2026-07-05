@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Package, CheckCircle, Clock, Truck, XCircle, ShoppingBag } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Search, Package, CheckCircle, Clock, Truck, XCircle, ShoppingBag, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import useCarritoStore from '../store/carritoStore'
+import useUiStore from '../store/uiStore'
+import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import useSEO from '../hooks/useSEO'
@@ -17,11 +20,25 @@ const ESTADO_INFO = {
 
 export default function MisPedidos() {
   useSEO({ titulo: 'Mis pedidos', descripcion: 'Consulta el estado de tus pedidos en Tatitos Panalera.', url: '/mis-pedidos' })
+  const navigate = useNavigate()
+  const agregarItem = useCarritoStore((s) => s.agregarItem)
+  const abrirCarrito = useUiStore((s) => s.abrirCarrito)
 
   const [telefono, setTelefono] = useState('')
   const [pedidos, setPedidos] = useState(null)
   const [loading, setLoading] = useState(false)
   const [buscado, setBuscado] = useState(false)
+
+  const repetirPedido = (pedido) => {
+    if (!Array.isArray(pedido.items) || !pedido.items.length) return
+    pedido.items.forEach((item) => {
+      for (let i = 0; i < item.cantidad; i++) {
+        agregarItem({ id: item.producto_id, nombre: item.nombre, precio: item.precio })
+      }
+    })
+    toast.success('Productos agregados al carrito 🛒')
+    navigate('/tienda/carrito')
+  }
 
   const buscar = async (e) => {
     e.preventDefault()
@@ -107,11 +124,19 @@ export default function MisPedidos() {
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t gap-3">
                     <div className="text-xs text-muted capitalize">{p.tipo_entrega === 'domicilio' ? 'Envio a domicilio' : p.tipo_entrega === 'retiro' ? 'Retiro' : 'Envio a localidad'}</div>
-                    <p className="font-display font-black text-lg text-primary">
-                      ${Number(p.total).toLocaleString('es-AR')}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => repetirPedido(p)}
+                        className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
+                      >
+                        <RotateCcw size={12} /> Repetir pedido
+                      </button>
+                      <p className="font-display font-black text-lg text-primary">
+                        ${Number(p.total).toLocaleString('es-AR')}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )

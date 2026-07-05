@@ -249,6 +249,12 @@ export default function Carrito() {
       tipo_entrega: form.tipo_entrega, direccion: form.direccion,
       provincia: form.provincia, ciudad: form.ciudad,
     }))
+    // Guardar contacto en carrito para tracking de abandono
+    const id = generarCarritoId()
+    supabase.from('carritos').upsert({
+      id, items, updated_at: new Date().toISOString(),
+      nombre: form.nombre, telefono: form.telefono,
+    })
     setPaso(3)
   }
 
@@ -281,6 +287,7 @@ export default function Carrito() {
 
       if (!res.ok) throw new Error()
       const { init_point } = await res.json()
+      supabase.from('carritos').update({ completado: true }).eq('id', generarCarritoId())
       vaciarCarrito()
       window.location.href = init_point
     } catch {
@@ -323,6 +330,7 @@ export default function Carrito() {
     ].filter(Boolean).join('\n')
 
     window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(mensaje)}`, '_blank')
+    supabase.from('carritos').update({ completado: true }).eq('id', generarCarritoId())
     vaciarCarrito()
     navigate('/pedido/confirmado')
   }

@@ -148,10 +148,12 @@ export default function AdminPedidos() {
   const [pagina, setPagina] = useState(1)
   const [nuevos, setNuevos] = useState(0)
   const [pedidoPuni, setPedidoPuni] = useState(null)
+  const [abandonados, setAbandonados] = useState([])
   const esDemo = useRef(false)
 
   useEffect(() => {
     cargar()
+    cargarAbandonados()
   }, [])
 
   // Realtime: nuevo pedido
@@ -205,6 +207,18 @@ export default function AdminPedidos() {
       setPedidos(PEDIDOS_DEMO)
     }
     setLoading(false)
+  }
+
+  async function cargarAbandonados() {
+    const hace48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    const { data } = await supabase
+      .from('carritos')
+      .select('*')
+      .not('telefono', 'is', null)
+      .eq('completado', false)
+      .gte('updated_at', hace48h)
+      .order('updated_at', { ascending: false })
+    if (data) setAbandonados(data)
   }
 
   const MENSAJES_ESTADO = {
@@ -267,6 +281,44 @@ export default function AdminPedidos() {
           </button>
         </div>
       </div>
+
+      {/* Carritos abandonados */}
+      {abandonados.length > 0 && (
+        <div className="card p-4 mb-6 border-l-4 border-orange-400">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle size={16} className="text-orange-500" />
+            <h2 className="font-display font-bold text-gray-800">
+              Carritos abandonados — últimas 48hs ({abandonados.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {abandonados.map((c) => {
+              const itemsLabel = Array.isArray(c.items)
+                ? c.items.map((i) => `${i.nombre} x${i.cantidad}`).join(', ')
+                : ''
+              const msg = encodeURIComponent(`Hola ${c.nombre}! 👋 Notamos que dejaste productos en tu carrito de Tatitos Pañalera. ¿Querés que te ayudemos a completar tu pedido? 🛒`)
+              return (
+                <div key={c.id} className="flex items-center justify-between gap-3 bg-orange-50 rounded-xl px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {c.nombre} — <span className="text-primary">{c.telefono}</span>
+                    </p>
+                    <p className="text-xs text-muted truncate">{itemsLabel}</p>
+                  </div>
+                  <a
+                    href={`https://wa.me/549${(c.telefono || '').replace(/\D/g, '')}?text=${msg}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-xs bg-[#25D366] text-white px-3 py-1.5 rounded-full font-semibold hover:bg-[#20b958]"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 flex-wrap mb-6">
