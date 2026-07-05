@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import useSEO from '../hooks/useSEO'
 
 export default function PedidoConfirmado() {
   useSEO({ titulo: 'Pedido recibido', descripcion: 'Tu pedido fue recibido. Tatitos Pañalera.' })
   const WA = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'
+
+  useEffect(() => {
+    if (window.fbq) window.fbq('track', 'Purchase', { currency: 'ARS', value: 0 })
+  }, [])
 
   return (
     <div className="min-h-screen bg-light flex items-center justify-center px-4">

@@ -53,6 +53,15 @@ export default function Producto() {
           setVarianteSeleccionada(conStock || data.variantes[0])
         }
 
+        // ViewContent
+        if (window.fbq) window.fbq('track', 'ViewContent', {
+          content_ids: [data.id],
+          content_name: data.nombre,
+          content_type: 'product',
+          value: data.precio,
+          currency: 'ARS',
+        })
+
         // Cargar relacionados sin bloquear
         supabase
           .from('productos')
@@ -116,6 +125,13 @@ export default function Producto() {
     }
     const label = varianteSeleccionada ? ` (${varianteSeleccionada.label})` : ''
     toast.success(`${cantidad > 1 ? `${cantidad}x ` : ''}${producto.nombre}${label} agregado`)
+    if (window.fbq) window.fbq('track', 'AddToCart', {
+      content_ids: [producto.id],
+      content_name: producto.nombre,
+      content_type: 'product',
+      value: precioActual * cantidad,
+      currency: 'ARS',
+    })
     abrirCarrito()
   }
 
