@@ -38,7 +38,6 @@ export default function Producto() {
           .single()
 
         if (err || !data) {
-          console.error('[Producto] Error Supabase:', err, '| id:', id)
           setError(true)
           return
         }
@@ -76,8 +75,7 @@ export default function Producto() {
           // realtime no disponible, la vista funciona igual
         }
 
-      } catch (e) {
-        console.error('[Producto] EXCEPCION:', e)
+      } catch {
         setError(true)
       } finally {
         setLoading(false)
