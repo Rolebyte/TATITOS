@@ -12,12 +12,8 @@ const CATEGORIAS = [
   { label: 'Todos', slug: '' },
   { label: 'Pañales', slug: 'pañales' },
   { label: 'Toallitas', slug: 'toallitas' },
-  { label: 'Cremas', slug: 'cremas' },
   { label: 'Higiene', slug: 'higiene' },
-  { label: 'Ropa', slug: 'ropa' },
   { label: 'Regalería', slug: 'regaleria' },
-  { label: 'Limpieza', slug: 'limpieza' },
-  { label: 'Juguetes', slug: 'juguetes' },
 ]
 
 // Productos de ejemplo para cuando Supabase no está configurado
