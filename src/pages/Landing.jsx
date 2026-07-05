@@ -295,7 +295,7 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
             <a
-              href="https://wa.me/5493492710605?text=Hola%20Tatitos%2C%20quiero%20consultar%20un%20pedido"
+              href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'}?text=Hola%20Tatitos!%20Quiero%20ver%20el%20cat%C3%A1logo%20y%20consultar%20precios%20%F0%9F%91%B6`}
               target="_blank"
               rel="noopener noreferrer"
               className="card p-6 text-center hover:scale-105 transition-transform duration-200 group"

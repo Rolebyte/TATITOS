@@ -1,7 +1,7 @@
-const WHATSAPP = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492000000'
+const WHATSAPP = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'
 
 export default function WhatsAppBoton() {
-  const link = `https://wa.me/${WHATSAPP}?text=Hola%20Tatitos%2C%20quiero%20hacer%20una%20consulta`
+  const link = `https://wa.me/${WHATSAPP}?text=Hola%20Tatitos!%20Quiero%20ver%20el%20cat%C3%A1logo%20y%20consultar%20precios%20%F0%9F%91%B6`
 
   return (
     <a

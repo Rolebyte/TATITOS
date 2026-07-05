@@ -9,7 +9,7 @@ import { PROVINCIAS } from '../data/provincias'
 import { supabase } from '../lib/supabase'
 
 const COSTO_ENVIO_LOCAL = 3500
-const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492000000'
+const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'
 const RECARGO_MP = 0.0642
 
 function validarTelefono(tel) {
