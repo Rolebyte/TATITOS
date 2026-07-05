@@ -121,7 +121,7 @@ function ModalPuni({ pedido, onClose }) {
         <div className="flex items-start gap-2 bg-amber-50 border-b border-amber-200 px-5 py-3">
           <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-800 font-medium">
-            Recordá abrirle al repartidor desde tu cuenta de MercadoPago antes de que salga.
+            Recordá pagarle al repartidor desde tu cuenta de MercadoPago antes de que salga.
           </p>
         </div>
 
