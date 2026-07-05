@@ -239,26 +239,26 @@ export default function Landing() {
               </p>
               <p className="text-muted leading-relaxed mb-8">
                 Somos un emprendimiento rafaelino, familiar y con ganas de crecer junto a las familias de nuestra ciudad
-                y de todo el país. Queremos que cuando llegue tu pedido, sientas que lo armó alguien que entiende lo que es tener un bebé en casa — no una empresa que simplemente empaqueta y manda.
+                y de todo el país. Cuando llega tu pedido, queremos que sientas que lo armó alguien que entiende lo que es tener un bebé en casa — no una empresa que simplemente empaqueta y manda.
               </p>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-pink-50 flex items-center justify-center shrink-0">
                     <MapPin size={18} className="text-primary" />
                   </div>
-                  <span className="text-gray-700 text-sm">Rafaela, Santa Fe, Argentina</span>
+                  <span className="text-gray-700 text-sm">A. Díaz 34, Rafaela, Santa Fe</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-pink-50 flex items-center justify-center shrink-0">
                     <Clock size={18} className="text-primary" />
                   </div>
-                  <span className="text-gray-700 text-sm">Lunes a viernes 8–20hs · Sábados 9–13hs</span>
+                  <span className="text-gray-700 text-sm">Lunes a sábado · 9 a 20hs</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-pink-50 flex items-center justify-center shrink-0">
                     <Truck size={18} className="text-primary" />
                   </div>
-                  <span className="text-gray-700 text-sm">Envíos por Correo Argentino y OCA a todo el país</span>
+                  <span className="text-gray-700 text-sm">Envíos a domicilio en Rafaela y a todo el país</span>
                 </div>
               </div>
             </div>
