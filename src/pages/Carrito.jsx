@@ -219,9 +219,12 @@ export default function Carrito() {
 
   const ciudades = PROVINCIAS.find((p) => p.nombre === form.provincia)?.ciudades || []
 
-  // Efectivo solo disponible para retiro
+  // Efectivo solo para retiro; MP solo para retiro y domicilio
   useEffect(() => {
     if (form.tipo_entrega !== 'retiro' && metodoPago === 'efectivo') {
+      setMetodoPago('transferencia')
+    }
+    if (form.tipo_entrega === 'localidad' && metodoPago === 'mercadopago') {
       setMetodoPago('transferencia')
     }
   }, [form.tipo_entrega])
@@ -641,9 +644,14 @@ export default function Carrito() {
             {/* Selector de medio de pago */}
             <div className="card p-5 mb-4">
               <h3 className="font-display font-bold text-gray-800 mb-3">Medio de pago</h3>
-              {form.tipo_entrega !== 'retiro' && (
+              {form.tipo_entrega === 'localidad' && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-                  💵 El pago en efectivo solo está disponible para retiro.
+                  📦 Para envíos a otras localidades solo disponemos transferencia bancaria. Coordinamos el costo de envío por WhatsApp antes de despachar.
+                </p>
+              )}
+              {form.tipo_entrega === 'domicilio' && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                  💵 El pago en efectivo no está disponible para envíos a domicilio.
                 </p>
               )}
               <div className="space-y-2">
@@ -651,7 +659,11 @@ export default function Carrito() {
                   { value: 'efectivo', label: 'Efectivo', sub: 'Pagás al retirar', icon: '💵' },
                   { value: 'transferencia', label: 'Transferencia bancaria', sub: 'Te enviamos el CBU/alias por WhatsApp', icon: '🏦' },
                   { value: 'mercadopago', label: 'Mercado Pago', sub: `Recargo del 6,42% por comisión de la plataforma`, icon: '💳', recargo: true },
-                ].filter(({ value }) => !(form.tipo_entrega !== 'retiro' && value === 'efectivo'))
+                ].filter(({ value }) => {
+                  if (form.tipo_entrega === 'localidad') return value === 'transferencia'
+                  if (form.tipo_entrega === 'domicilio') return value !== 'efectivo'
+                  return true
+                })
                 .map(({ value, label, sub, icon, recargo }) => (
                   <label key={value} className={`border-2 rounded-xl p-3.5 cursor-pointer flex items-start gap-3 transition-colors ${
                     metodoPago === value ? 'border-primary bg-pink-50' : 'border-gray-200 hover:border-gray-300'
