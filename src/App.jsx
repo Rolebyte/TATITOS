@@ -19,6 +19,8 @@ import AdminClientes from './pages/admin/AdminClientes'
 import AdminHistorico from './pages/admin/AdminHistorico'
 import AdminCupones from './pages/admin/AdminCupones'
 import AdminPromos from './pages/admin/AdminPromos'
+import AdminEscaner from './pages/admin/AdminEscaner'
+import AdminIngresos from './pages/admin/AdminIngresos'
 import AdminLayout from './components/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import CarritoDrawer from './components/CarritoDrawer'
@@ -74,6 +76,8 @@ export default function App() {
             <Route path="/admin/historico" element={<AdminHistorico />} />
             <Route path="/admin/cupones" element={<AdminCupones />} />
             <Route path="/admin/promos" element={<AdminPromos />} />
+            <Route path="/admin/escaner" element={<AdminEscaner />} />
+            <Route path="/admin/ingresos" element={<AdminIngresos />} />
           </Route>
         </Route>
 

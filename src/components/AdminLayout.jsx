@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Baby, Package, ShoppingBag, BarChart2, LogOut, Users, History, Tag, Megaphone, Menu, X } from 'lucide-react'
+import { Baby, Package, ShoppingBag, BarChart2, LogOut, Users, History, Tag, Megaphone, Menu, X, ScanLine, ClipboardList } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 
 const navLinks = [
@@ -11,6 +11,8 @@ const navLinks = [
   { to: '/admin/historico', label: 'Historial',   icon: History },
   { to: '/admin/cupones',   label: 'Cupones',     icon: Tag },
   { to: '/admin/promos',    label: 'Promos',      icon: Megaphone },
+  { to: '/admin/escaner',  label: 'Escanear',    icon: ScanLine },
+  { to: '/admin/ingresos', label: 'Ingresos',    icon: ClipboardList },
 ]
 
 // Solo los 4 más usados en el bottom bar móvil
