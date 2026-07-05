@@ -54,6 +54,33 @@ function EditableCell({ value, onSave, prefix = '' }) {
   )
 }
 
+function EditableEAN({ value, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value || '')
+  const ref = useRef()
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+  const save = () => { onSave(val.trim() || null); setEditing(false) }
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input ref={ref} type="text" value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          placeholder="EAN..."
+          className="w-36 border border-primary rounded px-1.5 py-0.5 text-xs font-mono focus:outline-none"
+        />
+        <button onClick={save} className="text-green-600"><Check size={14} /></button>
+        <button onClick={() => setEditing(false)} className="text-gray-400"><X size={14} /></button>
+      </div>
+    )
+  }
+  return (
+    <button onClick={() => setEditing(true)} className="text-xs font-mono text-gray-500 hover:text-primary hover:underline">
+      {value || <span className="text-gray-300 italic">+ EAN</span>}
+    </button>
+  )
+}
+
 function ModalProducto({ producto, onClose, onGuardado }) {
   const esEdicion = !!producto
   const [form, setForm] = useState(
@@ -600,6 +627,7 @@ export default function AdminStock() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Categoría</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Precio</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Stock</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">EAN</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Activo</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Acciones</th>
@@ -626,6 +654,9 @@ export default function AdminStock() {
                   </td>
                   <td className="px-4 py-3">
                     <EditableCell value={p.stock} onSave={(v) => actualizarCampo(p.id, 'stock', v)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <EditableEAN value={p.ean} onSave={(v) => actualizarCampo(p.id, 'ean', v)} />
                   </td>
                   <td className="px-4 py-3">
                     <span className={`badge text-xs ${stockColor(p.stock)}`}>{stockLabel(p.stock)}</span>
