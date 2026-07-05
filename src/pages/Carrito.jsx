@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Minus, Plus, Trash2, ArrowLeft, ShoppingBag, Home, MapPin, Store, Tag, X, MessageCircle, Zap, AlertTriangle, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
@@ -83,6 +83,7 @@ function datosCompletos(d) {
 
 export default function Carrito() {
   useSEO({ titulo: 'Mi carrito', descripcion: 'Revisá tu carrito de compras en Tatitos Pañalera.', url: '/tienda/carrito' })
+  const navigate = useNavigate()
   const { items, quitarItem, cambiarCantidad, vaciarCarrito, restaurarItems, generarCarritoId, carritoId } = useCarritoStore()
   const subtotal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
   const [searchParams] = useSearchParams()
@@ -314,6 +315,8 @@ export default function Carrito() {
     ].filter(Boolean).join('\n')
 
     window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(mensaje)}`, '_blank')
+    vaciarCarrito()
+    navigate('/pedido/confirmado')
   }
 
   // ─────────────────────────────────────────────────────────

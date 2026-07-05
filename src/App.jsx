@@ -8,6 +8,7 @@ import Producto from './pages/Producto'
 import PagoExito from './pages/PagoExito'
 import PagoPendiente from './pages/PagoPendiente'
 import PagoError from './pages/PagoError'
+import PedidoConfirmado from './pages/PedidoConfirmado'
 import MisPedidos from './pages/MisPedidos'
 
 import AdminLogin from './pages/admin/AdminLogin'
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/pago/exito" element={<PagoExito />} />
         <Route path="/pago/pendiente" element={<PagoPendiente />} />
         <Route path="/pago/error" element={<PagoError />} />
+        <Route path="/pedido/confirmado" element={<PedidoConfirmado />} />
         <Route path="/mis-pedidos" element={<MisPedidos />} />
 
         <Route path="/admin" element={<AdminLogin />} />

@@ -1,10 +1,8 @@
-import { useSearchParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import useSEO from '../hooks/useSEO'
 
-export default function PagoExito() {
-  useSEO({ titulo: 'Pago exitoso', descripcion: 'Tu pedido fue recibido. Tatitos Pañalera.' })
-  const [params] = useSearchParams()
-  const paymentId = params.get('payment_id')
+export default function PedidoConfirmado() {
+  useSEO({ titulo: 'Pedido recibido', descripcion: 'Tu pedido fue recibido. Tatitos Pañalera.' })
   const WA = import.meta.env.VITE_WHATSAPP_NUMBER || '5493492710605'
 
   return (
@@ -31,7 +29,6 @@ export default function PagoExito() {
       <div className="max-w-md w-full text-center">
         <div className="card p-10">
 
-          {/* Círculo animado con check */}
           <div className="flex justify-center mb-6">
             <div className="anim-pop w-24 h-24 rounded-full bg-green-100 flex items-center justify-center">
               <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
@@ -51,19 +48,13 @@ export default function PagoExito() {
 
           <div className="anim-fade-up" style={{ animationDelay: '0.6s', opacity: 0 }}>
             <h1 className="font-display text-2xl font-black text-gray-900 mb-2">
-              ¡Compra realizada! 🎉
+              ¡Pedido recibido! 🎉
             </h1>
             <p className="text-gray-600 mb-1">
               Gracias por confiar en <strong>Tatitos Pañalera</strong>.
             </p>
-            <p className="text-sm text-muted mb-2">
-              Tu pedido está siendo preparado con cariño.
-            </p>
-            {paymentId && (
-              <p className="text-xs text-gray-400 mb-6">ID de pago: {paymentId}</p>
-            )}
-            <p className="text-sm text-gray-500 mb-8">
-              Te contactaremos por WhatsApp con el seguimiento de tu pedido. 💕
+            <p className="text-sm text-muted mb-6">
+              En breve nos comunicamos por WhatsApp para confirmar y coordinar la entrega. 💕
             </p>
             <div className="flex flex-col gap-3">
               <Link to="/tienda" className="btn-primary justify-center">
