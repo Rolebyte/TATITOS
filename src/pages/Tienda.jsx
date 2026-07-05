@@ -15,7 +15,7 @@ const CATEGORIAS = [
   { label: 'Cremas', slug: 'cremas' },
   { label: 'Higiene', slug: 'higiene' },
   { label: 'Ropa', slug: 'ropa' },
-  { label: 'Maternidad', slug: 'maternidad' },
+  { label: 'Regalería', slug: 'regaleria' },
   { label: 'Limpieza', slug: 'limpieza' },
   { label: 'Juguetes', slug: 'juguetes' },
 ]

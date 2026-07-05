@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { Plus, Upload, X, Check, ToggleLeft, ToggleRight, Pencil, Trash2 } from 'lucide-react'
 
-const CATEGORIAS = ['pañales', 'toallitas', 'cremas', 'higiene', 'ropa', 'maternidad', 'limpieza', 'juguetes']
+const CATEGORIAS = ['pañales', 'pañales adultos', 'toallitas', 'cremas', 'higiene', 'ropa', 'regaleria', 'limpieza', 'puericultura', 'perfumería', 'juguetes']
 
 const STOCK_DEMO = [
   { id: '1', nombre: 'Pampers Etapas T2 x40', categoria: 'pañales', marca: 'Pampers', precio: 5850, stock: 18, activo: true, imagen_url: null, descripcion: '' },
@@ -12,7 +12,9 @@ const STOCK_DEMO = [
   { id: '4', nombre: 'Crema Bepanthen 30g', categoria: 'cremas', marca: 'Bepanthen', precio: 3200, stock: 0, activo: false, imagen_url: null, descripcion: '' },
 ]
 
-const FORM_EMPTY = { nombre: '', precio: '', stock: '', categoria: 'pañales', marca: '', descripcion: '' }
+const TALLES = ['RN Prematuro', 'RN', 'RN+', 'P', 'T2', 'T3', 'M', 'T4', 'G', 'T5', 'XG', 'XXG', 'XXXG']
+
+const FORM_EMPTY = { nombre: '', precio: '', stock: '', categoria: 'pañales', marca: '', descripcion: '', talle: '', cantidad_unidades: '' }
 
 function stockColor(stock) {
   if (stock <= 0) return 'bg-red-100 text-red-600'
@@ -56,14 +58,65 @@ function ModalProducto({ producto, onClose, onGuardado }) {
   const esEdicion = !!producto
   const [form, setForm] = useState(
     esEdicion
-      ? { nombre: producto.nombre, precio: producto.precio, stock: producto.stock, categoria: producto.categoria, marca: producto.marca || '', descripcion: producto.descripcion || '' }
+      ? { nombre: producto.nombre, precio: producto.precio, stock: producto.stock, categoria: producto.categoria, marca: producto.marca || '', descripcion: producto.descripcion || '', talle: producto.talle || '', cantidad_unidades: producto.cantidad_unidades || '' }
       : FORM_EMPTY
   )
+  const [catalogoTodo, setCatalogoTodo] = useState([])
+  const [selectedLinea, setSelectedLinea] = useState('')
+  const [cantidadBloqueada, setCantidadBloqueada] = useState(false)
   const [imagen, setImagen] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [preview, setPreview] = useState(producto?.imagen_url || null)
+  const [catalogImagenUrl, setCatalogImagenUrl] = useState(producto?.imagen_url || null)
   const [imagenesExtra, setImagenesExtra] = useState(producto?.imagenes || [])
   const [urlInput, setUrlInput] = useState('')
+
+  useEffect(() => {
+    supabase.from('catalogo_productos').select('*').eq('activo', true).eq('categoria', form.categoria)
+      .order('marca').order('linea').order('presentacion')
+      .then(({ data }) => {
+        setCatalogoTodo(data || [])
+        setSelectedLinea('')
+        setCantidadBloqueada(false)
+      })
+  }, [form.categoria])
+
+  const marcasOpts = [...new Set(catalogoTodo.map(c => c.marca))].sort()
+  const lineasOpts = [...new Set(catalogoTodo.filter(c => c.marca === form.marca).map(c => c.linea))].sort()
+  const presOpts = catalogoTodo.filter(c => c.marca === form.marca && c.linea === selectedLinea)
+
+  const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState([])
+  const [mostrarResultados, setMostrarResultados] = useState(false)
+
+  useEffect(() => {
+    if (busqueda.trim().length < 2) { setResultados([]); return }
+    const q = busqueda.toLowerCase()
+    supabase.from('catalogo_productos').select('*').eq('activo', true)
+      .or(`marca.ilike.%${q}%,linea.ilike.%${q}%,presentacion.ilike.%${q}%,categoria.ilike.%${q}%`)
+      .order('categoria').order('marca').order('linea').limit(20)
+      .then(({ data }) => { setResultados(data || []); setMostrarResultados(true) })
+  }, [busqueda])
+
+  const seleccionarDeResultado = (item) => {
+    const nombreAuto = [item.marca, item.linea, item.presentacion].filter(Boolean).join(' ')
+    setForm(f => ({
+      ...f,
+      categoria: item.categoria,
+      marca: item.marca,
+      talle: item.presentacion || '',
+      cantidad_unidades: item.cantidad_unidades ?? '',
+      nombre: f.nombre || nombreAuto,
+    }))
+    setSelectedLinea(item.linea)
+    setCantidadBloqueada(item.cantidad_unidades != null)
+    setBusqueda('')
+    setMostrarResultados(false)
+    if (item.imagen_url) { setPreview(item.imagen_url); setCatalogImagenUrl(item.imagen_url) }
+    supabase.from('catalogo_productos').select('*').eq('activo', true).eq('categoria', item.categoria)
+      .order('marca').order('linea').order('presentacion')
+      .then(({ data }) => setCatalogoTodo(data || []))
+  }
 
   const handleImagen = (e) => {
     const file = e.target.files[0]
@@ -78,7 +131,7 @@ function ModalProducto({ producto, onClose, onGuardado }) {
     }
     setGuardando(true)
     try {
-      let imagen_url = producto?.imagen_url || null
+      let imagen_url = catalogImagenUrl || producto?.imagen_url || null
 
       if (imagen) {
         const ext = imagen.name.split('.').pop()
@@ -99,6 +152,8 @@ function ModalProducto({ producto, onClose, onGuardado }) {
         marca: form.marca,
         imagen_url,
         imagenes: imagenesExtra,
+        talle: form.talle || null,
+        cantidad_unidades: form.cantidad_unidades ? Number(form.cantidad_unidades) : null,
       }
 
       if (esEdicion) {
@@ -189,12 +244,158 @@ function ModalProducto({ producto, onClose, onGuardado }) {
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Marca</label>
-            <input value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })}
-              placeholder="Pampers"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          {/* Buscador rápido de catálogo */}
+          <div className="relative">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Buscar producto del catálogo</label>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onFocus={() => busqueda.length >= 2 && setMostrarResultados(true)}
+              onBlur={() => setTimeout(() => setMostrarResultados(false), 150)}
+              placeholder="Ej: Huggies, Pampers Deluxe, shampoo Dove..."
+              className="w-full border border-primary/40 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-pink-50"
+            />
+            {mostrarResultados && resultados.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                {resultados.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onMouseDown={() => seleccionarDeResultado(item)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-pink-50 border-b border-gray-50 last:border-0 flex items-center gap-2"
+                  >
+                    {item.imagen_url
+                      ? <img src={item.imagen_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0 border border-gray-100" />
+                      : <div className="w-9 h-9 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-xs">?</div>
+                    }
+                    <div className="min-w-0">
+                      <span className="font-semibold text-gray-800">{item.marca} {item.linea}</span>
+                      {item.presentacion && <span className="text-gray-500"> — {item.presentacion}</span>}
+                      {item.cantidad_unidades && <span className="text-primary font-semibold"> x{item.cantidad_unidades}u</span>}
+                      <span className="ml-2 text-xs text-gray-400 capitalize">[{item.categoria}]</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {mostrarResultados && busqueda.length >= 2 && resultados.length === 0 && (
+              <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2 text-sm text-gray-400">
+                Sin resultados
+              </div>
+            )}
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Categoría *</label>
+            <select value={form.categoria}
+              onChange={(e) => {
+                setForm({ ...form, categoria: e.target.value, marca: '', talle: '', cantidad_unidades: '' })
+                setSelectedLinea('')
+                setCantidadBloqueada(false)
+              }}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+              {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Cascada: Marca → Línea → Presentación → Cantidad auto */}
+          {marcasOpts.length > 0 ? (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Marca *</label>
+                <select value={form.marca}
+                  onChange={(e) => {
+                    setForm(f => ({ ...f, marca: e.target.value, talle: '', cantidad_unidades: '' }))
+                    setSelectedLinea('')
+                    setCantidadBloqueada(false)
+                  }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  <option value="">Seleccionar marca...</option>
+                  {marcasOpts.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              {form.marca && lineasOpts.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Línea / Tipo</label>
+                  <select value={selectedLinea}
+                    onChange={(e) => {
+                      setSelectedLinea(e.target.value)
+                      setForm(f => ({ ...f, talle: '', cantidad_unidades: '' }))
+                      setCantidadBloqueada(false)
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">Seleccionar línea...</option>
+                    {lineasOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {selectedLinea && presOpts.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Presentación / Talle</label>
+                  <select value={form.talle}
+                    onChange={(e) => {
+                      const item = presOpts.find(p => p.presentacion === e.target.value)
+                      const nombreAuto = [form.marca, selectedLinea, e.target.value].filter(Boolean).join(' ')
+                      setForm(f => ({
+                        ...f,
+                        talle: e.target.value,
+                        cantidad_unidades: item?.cantidad_unidades ?? '',
+                        nombre: f.nombre || nombreAuto,
+                      }))
+                      setCantidadBloqueada(item?.cantidad_unidades != null)
+                      if (item?.imagen_url) { setPreview(item.imagen_url); setCatalogImagenUrl(item.imagen_url) }
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">Seleccionar presentación...</option>
+                    {presOpts.map(p => (
+                      <option key={p.id} value={p.presentacion}>
+                        {p.presentacion}{p.cantidad_unidades ? ` — ${p.cantidad_unidades} unidades` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Marca</label>
+              <input value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })}
+                placeholder="ej: Pampers"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+          )}
+
+          {/* Unidades: bloqueada si vino del catálogo, editable si no */}
+          {(form.talle || !marcasOpts.length) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Talle / Presentación</label>
+                <input value={form.talle} onChange={(e) => { setForm({ ...form, talle: e.target.value }); setCantidadBloqueada(false) }}
+                  placeholder="ej: G, 500ml..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Unidades en el pack
+                  {cantidadBloqueada && <span className="ml-1 text-green-600 font-normal">(auto)</span>}
+                </label>
+                {cantidadBloqueada
+                  ? (
+                    <div className="flex items-center gap-2 border border-green-200 bg-green-50 rounded-xl px-3 py-2">
+                      <span className="text-sm font-bold text-green-700 flex-1">{form.cantidad_unidades} u</span>
+                      <button type="button" onClick={() => setCantidadBloqueada(false)} className="text-xs text-gray-400 hover:text-gray-600">editar</button>
+                    </div>
+                  ) : (
+                    <input type="number" value={form.cantidad_unidades} onChange={(e) => setForm({ ...form, cantidad_unidades: e.target.value })}
+                      placeholder="ej: 60"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                  )
+                }
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Descripción</label>
@@ -216,14 +417,6 @@ function ModalProducto({ producto, onClose, onGuardado }) {
                 placeholder="10"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Categoría *</label>
-            <select value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-              {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
           </div>
         </div>
 

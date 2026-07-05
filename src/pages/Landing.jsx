@@ -30,7 +30,7 @@ const categorias = [
   { label: 'Toallitas húmedas', slug: 'toallitas', icon: Droplets, color: 'bg-blue-50 text-blue-500' },
   { label: 'Cremas y cuidado', slug: 'cremas', icon: Heart, color: 'bg-rose-50 text-rose-500' },
   { label: 'Ropa y accesorios', slug: 'ropa', icon: Shirt, color: 'bg-purple-50 text-purple-500' },
-  { label: 'Maternidad', slug: 'maternidad', icon: Star, color: 'bg-yellow-50 text-yellow-600' },
+  { label: 'Regalería', slug: 'regaleria', icon: Star, color: 'bg-yellow-50 text-yellow-600' },
   { label: 'Limpieza e higiene', slug: 'limpieza', icon: SprayCan, color: 'bg-green-50 text-green-500' },
 ]
 
