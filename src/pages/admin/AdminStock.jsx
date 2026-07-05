@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Plus, Upload, X, Check, ToggleLeft, ToggleRight, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Upload, X, Check, ToggleLeft, ToggleRight, Pencil, Trash2, Bell } from 'lucide-react'
 
 const CATEGORIAS = ['pañales', 'pañales adultos', 'toallitas', 'cremas', 'higiene', 'ropa', 'regaleria', 'limpieza', 'puericultura', 'perfumería', 'juguetes']
 
@@ -437,8 +437,24 @@ export default function AdminStock() {
   const [modal, setModal] = useState(false)         // false = cerrado, null = nuevo, objeto = editar
   const [busqueda, setBusqueda] = useState('')
   const [confirmarEliminar, setConfirmarEliminar] = useState(null)
+  const [avisos, setAvisos] = useState([])
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar(); cargarAvisos() }, [])
+
+  async function cargarAvisos() {
+    const { data } = await supabase
+      .from('avisos_stock')
+      .select('*, productos(nombre)')
+      .eq('notificado', false)
+      .order('created_at', { ascending: false })
+    if (data) setAvisos(data)
+  }
+
+  async function marcarNotificado(id) {
+    await supabase.from('avisos_stock').update({ notificado: true }).eq('id', id)
+    setAvisos((prev) => prev.filter((a) => a.id !== id))
+    toast.success('Marcado como notificado')
+  }
 
   async function cargar() {
     setLoading(true)
@@ -495,6 +511,48 @@ export default function AdminStock() {
           <Plus size={16} /> Agregar producto
         </button>
       </div>
+
+      {/* Avisos de stock */}
+      {avisos.length > 0 && (
+        <div className="card p-4 mb-6 border-l-4 border-primary">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell size={16} className="text-primary" />
+            <h2 className="font-display font-bold text-gray-800">
+              Clientes esperando stock ({avisos.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {avisos.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-3 bg-pink-50 rounded-xl px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {a.nombre} — <span className="text-primary">{a.telefono}</span>
+                  </p>
+                  <p className="text-xs text-muted truncate">
+                    {a.productos?.nombre}{a.variante_label ? ` · ${a.variante_label}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={`https://wa.me/549${a.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${a.nombre}! 👋 Te avisamos que el producto que pediste volvió a tener stock en Tatitos Pañalera. ¡Aprovechá antes que se agote! 🛒`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs bg-[#25D366] text-white px-3 py-1.5 rounded-full font-semibold hover:bg-[#20b958]"
+                  >
+                    WhatsApp
+                  </a>
+                  <button
+                    onClick={() => marcarNotificado(a.id)}
+                    className="text-xs text-muted hover:text-green-600 px-2 py-1.5 rounded-full hover:bg-green-50"
+                  >
+                    <Check size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Buscador */}
       <div className="mb-4">

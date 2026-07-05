@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ShoppingCart, Package, Minus, Plus, Truck, Shield, RotateCcw } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, Package, Minus, Plus, Truck, Shield, RotateCcw, Bell, BellRing } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import useCarritoStore from '../store/carritoStore'
 import useUiStore from '../store/uiStore'
@@ -19,6 +19,10 @@ export default function Producto() {
   const [cantidad, setCantidad] = useState(1)
   const [relacionados, setRelacionados] = useState([])
   const [varianteSeleccionada, setVarianteSeleccionada] = useState(null)
+  const [avisoNombre, setAvisoNombre] = useState('')
+  const [avisoTel, setAvisoTel] = useState('')
+  const [avisoCargando, setAvisoCargando] = useState(false)
+  const [avisoEnviado, setAvisoEnviado] = useState(false)
 
   useEffect(() => {
     let channel = null
@@ -85,6 +89,22 @@ export default function Producto() {
     cargar()
     return () => { if (channel) supabase.removeChannel(channel) }
   }, [id])
+
+  const handleAvisoStock = async (e) => {
+    e.preventDefault()
+    if (!avisoNombre.trim() || !avisoTel.trim()) return
+    setAvisoCargando(true)
+    const { error } = await supabase.from('avisos_stock').insert({
+      producto_id: producto.id,
+      variante_label: varianteSeleccionada?.label || null,
+      nombre: avisoNombre.trim(),
+      telefono: avisoTel.trim(),
+    })
+    setAvisoCargando(false)
+    if (error) { toast.error('Hubo un error, intentá de nuevo'); return }
+    setAvisoEnviado(true)
+    toast.success('¡Te avisamos cuando llegue! 🔔')
+  }
 
   const handleAgregar = () => {
     if (tieneVariantes && !varianteSeleccionada) {
@@ -294,23 +314,62 @@ export default function Producto() {
               )}
 
               {/* Botones */}
-              <div className="flex gap-3 mb-8">
-                <button
-                  onClick={handleAgregar}
-                  disabled={sinStock}
-                  className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-full font-display font-bold text-base transition-colors ${
-                    sinStock
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-primary text-white hover:bg-pink-500'
-                  }`}
-                >
-                  <ShoppingCart size={20} />
-                  {sinStock ? 'Sin stock' : 'Agregar al carrito'}
-                </button>
-                <Link to="/tienda/carrito" className="btn-secondary py-4 px-5">
-                  Ver carrito
-                </Link>
-              </div>
+              {sinStock ? (
+                <div className="mb-8">
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+                    {avisoEnviado ? (
+                      <div className="flex flex-col items-center gap-2 py-2 text-center">
+                        <BellRing size={28} className="text-primary" />
+                        <p className="font-display font-bold text-gray-800">¡Listo, te avisamos!</p>
+                        <p className="text-xs text-muted">Te mandamos un WhatsApp en cuanto vuelva a haber stock.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+                          <Bell size={15} className="text-primary" /> Avisame cuando llegue
+                        </p>
+                        <p className="text-xs text-muted mb-3">Dejá tu nombre y WhatsApp y te contactamos cuando haya stock.</p>
+                        <form onSubmit={handleAvisoStock} className="space-y-2">
+                          <input
+                            value={avisoNombre}
+                            onChange={(e) => setAvisoNombre(e.target.value)}
+                            placeholder="Tu nombre"
+                            required
+                            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                          />
+                          <input
+                            value={avisoTel}
+                            onChange={(e) => setAvisoTel(e.target.value)}
+                            placeholder="WhatsApp (ej: 3492123456)"
+                            required
+                            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                          />
+                          <button
+                            type="submit"
+                            disabled={avisoCargando}
+                            className="w-full btn-primary justify-center py-2.5 disabled:opacity-60"
+                          >
+                            {avisoCargando ? 'Guardando...' : '🔔 Avisame'}
+                          </button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-3 mb-8">
+                  <button
+                    onClick={handleAgregar}
+                    className="flex-1 flex items-center justify-center gap-2 py-4 rounded-full font-display font-bold text-base transition-colors bg-primary text-white hover:bg-pink-500"
+                  >
+                    <ShoppingCart size={20} />
+                    Agregar al carrito
+                  </button>
+                  <Link to="/tienda/carrito" className="btn-secondary py-4 px-5">
+                    Ver carrito
+                  </Link>
+                </div>
+              )}
 
               {/* Garantías */}
               <div className="border-t pt-6 grid grid-cols-3 gap-4">
