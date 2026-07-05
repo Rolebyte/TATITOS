@@ -43,6 +43,7 @@ export default function Tienda() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [productos, setProductos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [orden, setOrden] = useState('nombre')
   const categoriaActiva = searchParams.get('categoria') || ''
   const busquedaParam = searchParams.get('busqueda') || ''
   const [busqueda, setBusqueda] = useState(busquedaParam)
@@ -87,14 +88,21 @@ export default function Tienda() {
     setLoading(false)
   }
 
-  const productosFiltrados = productos.filter((p) => {
-    const matchCategoria = !categoriaActiva || p.categoria === categoriaActiva
-    const matchBusqueda =
-      !busqueda ||
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.marca && p.marca.toLowerCase().includes(busqueda.toLowerCase()))
-    return matchCategoria && matchBusqueda
-  })
+  const productosFiltrados = productos
+    .filter((p) => {
+      const matchCategoria = !categoriaActiva || p.categoria === categoriaActiva
+      const matchBusqueda =
+        !busqueda ||
+        p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.marca && p.marca.toLowerCase().includes(busqueda.toLowerCase()))
+      return matchCategoria && matchBusqueda
+    })
+    .sort((a, b) => {
+      if (orden === 'precio_asc') return a.precio - b.precio
+      if (orden === 'precio_desc') return b.precio - a.precio
+      if (orden === 'stock') return (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0)
+      return a.nombre.localeCompare(b.nombre)
+    })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,24 +125,36 @@ export default function Tienda() {
               />
             </div>
 
-            {/* Filtros por categoría */}
-            <div className="flex gap-2 flex-wrap">
-              {CATEGORIAS.map(({ label, slug }) => (
-                <button
-                  key={slug}
-                  onClick={() => {
-                    if (slug) setSearchParams({ categoria: slug })
-                    else setSearchParams({})
-                  }}
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                    categoriaActiva === slug
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            {/* Filtros por categoría + ordenamiento */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex gap-2 flex-wrap">
+                {CATEGORIAS.map(({ label, slug }) => (
+                  <button
+                    key={slug}
+                    onClick={() => {
+                      if (slug) setSearchParams({ categoria: slug })
+                      else setSearchParams({})
+                    }}
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                      categoriaActiva === slug
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={orden}
+                onChange={(e) => setOrden(e.target.value)}
+                className="text-sm border border-gray-200 rounded-full px-4 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white text-gray-600 font-medium"
+              >
+                <option value="nombre">A → Z</option>
+                <option value="precio_asc">Menor precio</option>
+                <option value="precio_desc">Mayor precio</option>
+                <option value="stock">Disponibles primero</option>
+              </select>
             </div>
           </div>
         </div>
