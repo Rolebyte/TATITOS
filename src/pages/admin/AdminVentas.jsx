@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { TrendingUp, ShoppingBag, DollarSign, BarChart2, AlertTriangle, Package, Users, ArrowRight } from 'lucide-react'
+import { TrendingUp, ShoppingBag, DollarSign, AlertTriangle, Package, Users, ArrowRight, CreditCard, Truck, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const formatFecha = (d) => d.toISOString().split('T')[0]
@@ -24,12 +24,36 @@ function getDaysRange(desde, hasta) {
   return days
 }
 
+function getPeriodRange(periodo) {
+  const now = new Date()
+  if (periodo === '7d') {
+    const desde = new Date(now); desde.setDate(desde.getDate() - 7); desde.setHours(0,0,0,0)
+    const prev = new Date(desde); prev.setDate(prev.getDate() - 7)
+    return { desde, hasta: now, prevDesde: prev, prevHasta: new Date(desde) }
+  }
+  if (periodo === 'mes') {
+    const desde = new Date(now.getFullYear(), now.getMonth(), 1)
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const prevHasta = new Date(desde)
+    return { desde, hasta: now, prevDesde: prev, prevHasta }
+  }
+  if (periodo === '90d') {
+    const desde = new Date(now); desde.setDate(desde.getDate() - 90); desde.setHours(0,0,0,0)
+    const prev = new Date(desde); prev.setDate(prev.getDate() - 90)
+    return { desde, hasta: now, prevDesde: prev, prevHasta: new Date(desde) }
+  }
+  // 30d default
+  const desde = new Date(now); desde.setDate(desde.getDate() - 30); desde.setHours(0,0,0,0)
+  const prev = new Date(desde); prev.setDate(prev.getDate() - 30)
+  return { desde, hasta: now, prevDesde: prev, prevHasta: new Date(desde) }
+}
+
 const VENTAS_DEMO = [
-  { id: '1', numero: 1, cliente_nombre: 'María García', total: 11700, estado: 'entregado', mp_status: 'approved', created_at: new Date().toISOString(), items: [{ nombre: 'Pampers T2 x40', cantidad: 2, precio: 5850 }] },
-  { id: '2', numero: 2, cliente_nombre: 'Juan Rodríguez', total: 7500, estado: 'confirmado', mp_status: 'approved', created_at: new Date(Date.now() - 86400000).toISOString(), items: [{ nombre: 'Toallitas Pequeñín x80', cantidad: 3, precio: 2500 }] },
-  { id: '3', numero: 3, cliente_nombre: 'Ana López', total: 6100, estado: 'enviado', mp_status: 'approved', created_at: new Date(Date.now() - 172800000).toISOString(), items: [{ nombre: 'Pampers T3 x40', cantidad: 1, precio: 6100 }] },
-  { id: '4', numero: 4, cliente_nombre: 'Laura Sánchez', total: 9200, estado: 'entregado', mp_status: 'approved', created_at: new Date(Date.now() - 259200000).toISOString(), items: [{ nombre: 'Huggies T2 x40', cantidad: 1, precio: 5200 }, { nombre: 'Crema Bepanthen 30g', cantidad: 1, precio: 4000 }] },
-  { id: '5', numero: 5, cliente_nombre: 'Carlos Medina', total: 5200, estado: 'pendiente', mp_status: 'pending', created_at: new Date(Date.now() - 345600000).toISOString(), items: [{ nombre: 'Huggies T3 x36', cantidad: 1, precio: 5200 }] },
+  { id: '1', numero: 1, cliente_nombre: 'María García', total: 11700, estado: 'entregado', metodo_pago: 'mercadopago', tipo_entrega: 'domicilio', created_at: new Date().toISOString(), items: [{ nombre: 'Pampers T2 x40', cantidad: 2, precio: 5850 }] },
+  { id: '2', numero: 2, cliente_nombre: 'Juan Rodríguez', total: 7500, estado: 'confirmado', metodo_pago: 'transferencia', tipo_entrega: 'retiro', created_at: new Date(Date.now() - 86400000).toISOString(), items: [{ nombre: 'Toallitas Pequeñín x80', cantidad: 3, precio: 2500 }] },
+  { id: '3', numero: 3, cliente_nombre: 'Ana López', total: 6100, estado: 'enviado', metodo_pago: 'mercadopago', tipo_entrega: 'localidad', created_at: new Date(Date.now() - 172800000).toISOString(), items: [{ nombre: 'Pampers T3 x40', cantidad: 1, precio: 6100 }] },
+  { id: '4', numero: 4, cliente_nombre: 'Laura Sánchez', total: 9200, estado: 'entregado', metodo_pago: 'efectivo', tipo_entrega: 'retiro', created_at: new Date(Date.now() - 259200000).toISOString(), items: [{ nombre: 'Huggies T2 x40', cantidad: 1, precio: 5200 }, { nombre: 'Crema Bepanthen 30g', cantidad: 1, precio: 4000 }] },
+  { id: '5', numero: 5, cliente_nombre: 'Carlos Medina', total: 5200, estado: 'pendiente', metodo_pago: 'transferencia', tipo_entrega: 'domicilio', created_at: new Date(Date.now() - 345600000).toISOString(), items: [{ nombre: 'Huggies T3 x36', cantidad: 1, precio: 5200 }] },
 ]
 
 const STOCK_DEMO = [
@@ -38,7 +62,7 @@ const STOCK_DEMO = [
   { id: '3', nombre: 'Toallitas Pequeñín x80', stock: 1, activo: true },
 ]
 
-function MetricCard({ icon: Icon, label, value, sub, color, bgColor }) {
+function MetricCard({ icon: Icon, label, value, sub, color, bgColor, trend }) {
   return (
     <div className="card p-5">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${bgColor}`}>
@@ -46,7 +70,17 @@ function MetricCard({ icon: Icon, label, value, sub, color, bgColor }) {
       </div>
       <p className="text-xs text-muted mb-1 font-medium uppercase tracking-wide">{label}</p>
       <p className="font-display font-black text-2xl text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
+      <div className="flex items-center gap-1.5 mt-1">
+        {sub && <p className="text-xs text-muted">{sub}</p>}
+        {trend !== undefined && trend !== null && (
+          <span className={`text-xs font-bold flex items-center gap-0.5 ${
+            trend > 0 ? 'text-green-600' : trend < 0 ? 'text-red-500' : 'text-gray-400'
+          }`}>
+            {trend > 0 ? <ArrowUpRight size={12} /> : trend < 0 ? <ArrowDownRight size={12} /> : <Minus size={12} />}
+            {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -54,7 +88,6 @@ function MetricCard({ icon: Icon, label, value, sub, color, bgColor }) {
 function MiniBarChart({ data }) {
   if (!data || data.length === 0) return null
   const max = Math.max(...data.map((d) => d.total), 1)
-  const width = 100 / data.length
 
   return (
     <div className="flex items-end gap-0.5 h-20 w-full">
@@ -67,7 +100,6 @@ function MiniBarChart({ data }) {
               className={`w-full rounded-t transition-all ${isToday ? 'bg-primary' : 'bg-primary/30 group-hover:bg-primary/50'}`}
               style={{ height: `${height}%` }}
             />
-            {/* Tooltip */}
             {d.total > 0 && (
               <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 flex-col items-center">
                 <span className="font-bold">${d.total.toLocaleString('es-AR')}</span>
@@ -81,21 +113,58 @@ function MiniBarChart({ data }) {
   )
 }
 
+function BreakdownBar({ items }) {
+  const total = items.reduce((a, b) => a + b.valor, 0)
+  if (total === 0) return <p className="text-xs text-muted py-2">Sin datos</p>
+  return (
+    <div>
+      <div className="flex h-3 rounded-full overflow-hidden gap-0.5 mb-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={item.color}
+            style={{ width: `${(item.valor / total) * 100}%` }}
+            title={item.label}
+          />
+        ))}
+      </div>
+      <div className="space-y-1.5">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+              <span className="text-xs text-gray-600">{item.label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-800">${item.valor.toLocaleString('es-AR')}</span>
+              <span className="text-xs text-muted w-9 text-right">{Math.round((item.valor / total) * 100)}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminVentas() {
   const [pedidos, setPedidos] = useState([])
+  const [pedidosPrev, setPedidosPrev] = useState([])
   const [stockCritico, setStockCritico] = useState([])
   const [loading, setLoading] = useState(true)
   const [periodo, setPeriodo] = useState('30d')
 
   const periodos = {
-    '7d': { label: '7 días', desde: formatFecha(new Date(Date.now() - 7 * 86400000)) },
-    '30d': { label: '30 días', desde: formatFecha(new Date(Date.now() - 30 * 86400000)) },
-    '90d': { label: '3 meses', desde: formatFecha(new Date(Date.now() - 90 * 86400000)) },
+    '7d':  { label: '7 días' },
+    'mes': { label: 'Este mes' },
+    '30d': { label: '30 días' },
+    '90d': { label: '3 meses' },
   }
-  const hasta = formatFecha(new Date())
-  const desde = periodos[periodo].desde
 
-  useEffect(() => { cargar() }, [desde])
+  const { desde, hasta, prevDesde, prevHasta } = getPeriodRange(periodo)
+  const desdeStr = formatFecha(desde)
+  const hastaStr = formatFecha(hasta)
+
+  useEffect(() => { cargar() }, [periodo])
   useEffect(() => { cargarStock() }, [])
 
   async function cargar() {
@@ -104,14 +173,26 @@ export default function AdminVentas() {
       const { data, error } = await supabase
         .from('pedidos')
         .select('*')
-        .gte('created_at', `${desde}T00:00:00`)
-        .lte('created_at', `${hasta}T23:59:59`)
+        .gte('created_at', desde.toISOString())
+        .lte('created_at', hasta.toISOString())
         .not('estado', 'eq', 'cancelado')
         .order('created_at', { ascending: false })
       if (error || !data) throw error
       setPedidos(data)
+
+      // Período anterior para comparación
+      if (prevDesde && prevHasta) {
+        const { data: prev } = await supabase
+          .from('pedidos')
+          .select('total')
+          .gte('created_at', prevDesde.toISOString())
+          .lte('created_at', prevHasta.toISOString())
+          .not('estado', 'eq', 'cancelado')
+        setPedidosPrev(prev || [])
+      }
     } catch {
       setPedidos(VENTAS_DEMO)
+      setPedidosPrev([])
     }
     setLoading(false)
   }
@@ -132,23 +213,28 @@ export default function AdminVentas() {
     }
   }
 
-  // Métricas
+  // Métricas principales
   const totalPeriodo = pedidos.reduce((acc, p) => acc + Number(p.total), 0)
+  const totalPrev = pedidosPrev.reduce((acc, p) => acc + Number(p.total), 0)
+  const trendTotal = totalPrev > 0 ? Math.round(((totalPeriodo - totalPrev) / totalPrev) * 100) : null
+
   const pedidosHoy = pedidos.filter((p) => p.created_at >= startOf('day'))
   const totalHoy = pedidosHoy.reduce((acc, p) => acc + Number(p.total), 0)
   const pedidosSemana = pedidos.filter((p) => p.created_at >= startOf('week'))
   const totalSemana = pedidosSemana.reduce((acc, p) => acc + Number(p.total), 0)
   const ticketPromedio = pedidos.length ? Math.round(totalPeriodo / pedidos.length) : 0
+  const ticketPrev = pedidosPrev.length ? Math.round(totalPrev / pedidosPrev.length) : 0
+  const trendTicket = ticketPrev > 0 ? Math.round(((ticketPromedio - ticketPrev) / ticketPrev) * 100) : null
   const pendientes = pedidos.filter((p) => p.estado === 'pendiente').length
+  const clientesUnicos = new Set(pedidos.map((p) => p.cliente_telefono)).size
 
   // Gráfico por día
-  const dias = getDaysRange(desde, hasta)
+  const dias = getDaysRange(desdeStr, hastaStr)
   const ventasPorDia = dias.map((fecha) => ({
     fecha,
     total: pedidos
       .filter((p) => p.created_at.startsWith(fecha))
       .reduce((acc, p) => acc + Number(p.total), 0),
-    cant: pedidos.filter((p) => p.created_at.startsWith(fecha)).length,
   }))
 
   // Más vendidos
@@ -166,8 +252,39 @@ export default function AdminVentas() {
     .sort((a, b) => b[1].cant - a[1].cant)
     .slice(0, 8)
 
-  // Clientes únicos
-  const clientesUnicos = new Set(pedidos.map((p) => p.cliente_telefono)).size
+  // Desglose por método de pago
+  const metodoPagoMap = { mercadopago: 'MercadoPago', transferencia: 'Transferencia', efectivo: 'Efectivo' }
+  const coloresPago = { mercadopago: 'bg-blue-500', transferencia: 'bg-purple-500', efectivo: 'bg-green-500' }
+  const pagoDesglose = Object.entries(
+    pedidos.reduce((acc, p) => {
+      const m = p.metodo_pago || 'otro'
+      acc[m] = (acc[m] || 0) + Number(p.total)
+      return acc
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, valor]) => ({
+      label: metodoPagoMap[key] || key,
+      valor,
+      color: coloresPago[key] || 'bg-gray-400',
+    }))
+
+  // Desglose por tipo de entrega
+  const entregaMap = { domicilio: 'Domicilio (Rafaela)', retiro: 'Retiro en local', localidad: 'Envío a localidad' }
+  const coloresEntrega = { domicilio: 'bg-pink-500', retiro: 'bg-amber-400', localidad: 'bg-indigo-500' }
+  const entregaDesglose = Object.entries(
+    pedidos.reduce((acc, p) => {
+      const t = p.tipo_entrega || 'otro'
+      acc[t] = (acc[t] || 0) + Number(p.total)
+      return acc
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, valor]) => ({
+      label: entregaMap[key] || key,
+      valor,
+      color: coloresEntrega[key] || 'bg-gray-400',
+    }))
 
   return (
     <div>
@@ -192,7 +309,7 @@ export default function AdminVentas() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard icon={DollarSign} label="Hoy" value={`$${totalHoy.toLocaleString('es-AR')}`} sub={`${pedidosHoy.length} pedido${pedidosHoy.length !== 1 ? 's' : ''}`} bgColor="bg-pink-50" color="text-primary" />
         <MetricCard icon={TrendingUp} label="Esta semana" value={`$${totalSemana.toLocaleString('es-AR')}`} sub={`${pedidosSemana.length} pedido${pedidosSemana.length !== 1 ? 's' : ''}`} bgColor="bg-purple-50" color="text-secondary" />
-        <MetricCard icon={ShoppingBag} label="Ticket promedio" value={`$${ticketPromedio.toLocaleString('es-AR')}`} sub={`en ${periodos[periodo].label}`} bgColor="bg-green-50" color="text-green-600" />
+        <MetricCard icon={ShoppingBag} label="Ticket promedio" value={`$${ticketPromedio.toLocaleString('es-AR')}`} sub={`en ${periodos[periodo].label}`} bgColor="bg-green-50" color="text-green-600" trend={trendTicket} />
         <MetricCard icon={Users} label="Clientes" value={clientesUnicos} sub={`en ${periodos[periodo].label}`} bgColor="bg-blue-50" color="text-blue-600" />
       </div>
 
@@ -214,7 +331,17 @@ export default function AdminVentas() {
         <div className="lg:col-span-2 card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display font-bold text-gray-800">Ventas por día</h2>
-            <span className="text-xs text-muted">${totalPeriodo.toLocaleString('es-AR')} total</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted">${totalPeriodo.toLocaleString('es-AR')} total</span>
+              {trendTotal !== null && (
+                <span className={`text-xs font-bold flex items-center gap-0.5 ${
+                  trendTotal > 0 ? 'text-green-600' : trendTotal < 0 ? 'text-red-500' : 'text-gray-400'
+                }`}>
+                  {trendTotal > 0 ? <ArrowUpRight size={12} /> : trendTotal < 0 ? <ArrowDownRight size={12} /> : <Minus size={12} />}
+                  {trendTotal > 0 ? '+' : ''}{trendTotal}% vs período ant.
+                </span>
+              )}
+            </div>
           </div>
           {loading ? (
             <div className="h-20 flex items-center justify-center text-muted text-sm">Cargando...</div>
@@ -222,7 +349,7 @@ export default function AdminVentas() {
             <>
               <MiniBarChart data={ventasPorDia} />
               <div className="flex justify-between mt-2">
-                <span className="text-xs text-muted">{desde.slice(5)}</span>
+                <span className="text-xs text-muted">{desdeStr.slice(5)}</span>
                 <span className="text-xs text-muted">hoy</span>
               </div>
             </>
@@ -256,6 +383,24 @@ export default function AdminVentas() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Desgloses */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard size={16} className="text-gray-500" />
+            <h2 className="font-display font-bold text-gray-800">Por método de pago</h2>
+          </div>
+          <BreakdownBar items={pagoDesglose} />
+        </div>
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck size={16} className="text-gray-500" />
+            <h2 className="font-display font-bold text-gray-800">Por tipo de entrega</h2>
+          </div>
+          <BreakdownBar items={entregaDesglose} />
         </div>
       </div>
 
