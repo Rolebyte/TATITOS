@@ -126,6 +126,34 @@ export default function Producto() {
     url: `/tienda/producto/${producto.id}`,
   } : {})
 
+  // JSON-LD structured data para Google
+  useEffect(() => {
+    if (!producto) return
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.id = 'product-jsonld'
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: producto.nombre,
+      description: producto.descripcion || `${producto.nombre} disponible en Tatitos Pañalera, Rafaela.`,
+      image: producto.imagen_url || undefined,
+      brand: producto.marca ? { '@type': 'Brand', name: producto.marca } : undefined,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'ARS',
+        price: precioActual,
+        availability: stockActual > 0
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        seller: { '@type': 'Organization', name: 'Tatitos Pañalera' },
+        url: `https://tatitos.com.ar/tienda/producto/${producto.id}`,
+      },
+    })
+    document.head.appendChild(script)
+    return () => { document.getElementById('product-jsonld')?.remove() }
+  }, [producto, precioActual, stockActual])
+
   const todasLasImagenes = [
     producto?.imagen_url,
     ...(producto?.imagenes || []),
