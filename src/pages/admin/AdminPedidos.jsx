@@ -325,7 +325,12 @@ export default function AdminPedidos() {
                   <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                     ${Number(p.total).toLocaleString('es-AR')}
                   </td>
-                  <td className="px-4 py-3 capitalize text-gray-600 text-xs">{p.tipo_entrega}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">
+                    <span className="capitalize">{p.tipo_entrega}</span>
+                    {p.tipo_entrega === 'localidad' && (
+                      <span className="ml-1 text-orange-600 font-bold" title="Envío pendiente de cobro">⚠️ env. pendiente</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <select
                       value={p.estado}
