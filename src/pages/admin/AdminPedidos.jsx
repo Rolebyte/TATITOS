@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { MessageCircle, RefreshCw, Download, Bell } from 'lucide-react'
+import { MessageCircle, RefreshCw, Download, Bell, Bike, Copy, X, AlertTriangle } from 'lucide-react'
 
 const ESTADOS = ['pendiente', 'confirmado', 'preparando', 'enviado', 'entregado', 'cancelado']
 const TABS = ['Todos', 'pendiente', 'confirmado', 'preparando', 'enviado', 'entregado', 'cancelado']
@@ -76,12 +76,78 @@ function exportarCSV(pedidos) {
   URL.revokeObjectURL(url)
 }
 
+function copiar(texto, label) {
+  navigator.clipboard.writeText(texto).then(() => toast.success(`${label} copiado`))
+}
+
+function CampoCopiable({ label, valor }) {
+  return (
+    <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-xs text-muted font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-sm text-gray-900 font-semibold truncate">{valor || '—'}</p>
+      </div>
+      <button
+        onClick={() => copiar(valor || '', label)}
+        className="shrink-0 p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors"
+      >
+        <Copy size={14} />
+      </button>
+    </div>
+  )
+}
+
+function ModalPuni({ pedido, onClose }) {
+  if (!pedido) return null
+  const num = String(pedido.numero).padStart(4, '0')
+  const detalle = Array.isArray(pedido.items)
+    ? pedido.items.map((i) => `${i.nombre} x${i.cantidad}`).join(', ')
+    : ''
+  const valorProductos = Math.max(0, Number(pedido.total) - Number(pedido.costo_envio || 0))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div className="flex items-center gap-2">
+            <Bike size={18} className="text-primary" />
+            <span className="font-display font-bold text-gray-900">Envío Puni — #{num}</span>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {/* Aviso MP */}
+        <div className="flex items-start gap-2 bg-amber-50 border-b border-amber-200 px-5 py-3">
+          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 font-medium">
+            Recordá abrirle al repartidor desde tu cuenta de MercadoPago antes de que salga.
+          </p>
+        </div>
+
+        {/* Campos */}
+        <div className="p-5 space-y-2">
+          <CampoCopiable label="Dirección" valor={pedido.direccion} />
+          <CampoCopiable label="Teléfono cliente" valor={pedido.cliente_telefono} />
+          <CampoCopiable label="Comentario / Detalle" valor={`Tatitos #${num} — ${detalle}`} />
+          <CampoCopiable label="Valor comercio $" valor={String(valorProductos)} />
+        </div>
+
+        <div className="px-5 pb-5">
+          <p className="text-xs text-muted text-center">Ciudad: <strong>Rafaela Santa Fe</strong> (ya viene por defecto en Puni)</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPedidos() {
   const [pedidos, setPedidos] = useState([])
   const [loading, setLoading] = useState(true)
   const [tabActiva, setTabActiva] = useState('Todos')
   const [pagina, setPagina] = useState(1)
   const [nuevos, setNuevos] = useState(0)
+  const [pedidoPuni, setPedidoPuni] = useState(null)
   const esDemo = useRef(false)
 
   useEffect(() => {
@@ -240,6 +306,7 @@ export default function AdminPedidos() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">WA</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Puni</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -281,12 +348,25 @@ export default function AdminPedidos() {
                       <MessageCircle size={18} />
                     </a>
                   </td>
+                  <td className="px-4 py-3">
+                    {p.tipo_entrega === 'domicilio' && (
+                      <button
+                        onClick={() => setPedidoPuni(p)}
+                        className="text-primary hover:text-primary/80 transition-colors"
+                        title="Preparar envío Puni"
+                      >
+                        <Bike size={18} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <ModalPuni pedido={pedidoPuni} onClose={() => setPedidoPuni(null)} />
 
       {totalPaginas > 1 && (
         <div className="flex justify-center gap-2 mt-6">
