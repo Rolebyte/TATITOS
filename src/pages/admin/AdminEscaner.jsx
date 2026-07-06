@@ -22,6 +22,7 @@ export default function AdminEscaner() {
   const videoRef = useRef(null)
   const readerRef = useRef(null)
   const busquedaRef = useRef(null)
+  const busquedaIdRef = useRef(0)
 
   const [fase, setFase] = useState(FASE.ESCANEAR)
   const [escaneando, setEscaneando] = useState(false)
@@ -93,6 +94,10 @@ export default function AdminEscaner() {
     const eanLimpio = ean.trim()
     if (!eanLimpio) return
 
+    // Token de cancelación: si se llama de nuevo antes de que termine la query,
+    // el resultado anterior se descarta (evita race condition de doble escaneo)
+    const miId = ++busquedaIdRef.current
+
     setEanCapturado(eanLimpio)
     setBusqueda('')
     setImagenOff(null)
@@ -102,20 +107,26 @@ export default function AdminEscaner() {
     // Buscar imagen en OFF en background
     setCargandoImagen(true)
     fetchImagenOFF(eanLimpio).then((img) => {
+      if (busquedaIdRef.current !== miId) return
       setImagenOff(img)
       setCargandoImagen(false)
     })
 
     // Verificar si el EAN ya está en la DB → pre-seleccionar
-    const { data: prodDirecto } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('activo', true)
-      .eq('ean', eanLimpio)
-      .maybeSingle()
+    try {
+      const { data: prodDirecto } = await supabase
+        .from('productos')
+        .select('*')
+        .eq('activo', true)
+        .eq('ean', eanLimpio)
+        .maybeSingle()
 
-    if (prodDirecto) {
-      setProductoPreseleccionado(prodDirecto)
+      if (busquedaIdRef.current !== miId) return
+      if (prodDirecto) setProductoPreseleccionado(prodDirecto)
+    } catch {
+      if (busquedaIdRef.current !== miId) return
+      toast.error('Error al buscar el producto')
+      setFase(FASE.ESCANEAR)
     }
   }
 
