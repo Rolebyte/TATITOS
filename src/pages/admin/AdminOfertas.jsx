@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Tag, Plus, X, Check, Clock, TrendingDown, Package, Zap, Eye, Trash2 } from 'lucide-react'
+import { Tag, Eye, Clock, TrendingDown, Package, Zap, Trash2, Check } from 'lucide-react'
 
 const DURACIONES = [
   { label: '1 día', horas: 24 },
@@ -28,19 +28,131 @@ function Countdown({ fechaFin }) {
   return <span>{texto}</span>
 }
 
+// Tarjeta de sugerencia con slider + métricas inline
+function SugerenciaCard({ producto, onPublicar }) {
+  const [descuento, setDescuento] = useState(
+    producto.stock >= 10 ? 20 : producto.stock >= 5 ? 15 : 10
+  )
+  const [duracion, setDuracion] = useState(168)
+  const [guardando, setGuardando] = useState(false)
+
+  const precioOferta = Math.round(producto.precio * (1 - descuento / 100))
+  const diferencia = producto.precio - precioOferta
+  const ingresoOferta = precioOferta * producto.stock
+  const ingresoFull = producto.precio * producto.stock
+
+  const motivoSugerencia = () => {
+    if (producto.stock >= 15) return { texto: 'Stock alto — ideal para mover', color: 'text-blue-600 bg-blue-50' }
+    if (producto.stock >= 8) return { texto: 'Buen stock disponible', color: 'text-green-600 bg-green-50' }
+    if (producto.stock <= 3) return { texto: '¡Últimas unidades!', color: 'text-orange-600 bg-orange-50' }
+    return { texto: 'Recomendado', color: 'text-primary bg-pink-50' }
+  }
+  const motivo = motivoSugerencia()
+
+  async function publicar() {
+    setGuardando(true)
+    try {
+      const fechaFin = new Date(Date.now() + duracion * 3600000).toISOString()
+      const { error } = await supabase.from('ofertas').insert({
+        producto_id: producto.id,
+        precio_oferta: precioOferta,
+        fecha_fin: fechaFin,
+        activa: true,
+      })
+      if (error) throw error
+      toast.success(`¡Oferta publicada! ${producto.nombre} al ${descuento}% OFF`)
+      onPublicar()
+    } catch {
+      toast.error('Error al publicar la oferta')
+    }
+    setGuardando(false)
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      {/* Fila superior: imagen + nombre + chip */}
+      <div className="flex items-center gap-3">
+        {producto.imagen_url
+          ? <img src={producto.imagen_url} alt="" className="w-12 h-12 object-contain rounded-xl border border-gray-100 shrink-0" />
+          : <div className="w-12 h-12 bg-gray-100 rounded-xl shrink-0 flex items-center justify-center"><Package size={18} className="text-gray-300" /></div>
+        }
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-gray-900 truncate">{producto.nombre}</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted">${producto.precio.toLocaleString('es-AR')} · {producto.stock} en stock</span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${motivo.color}`}>{motivo.texto}</span>
+          </div>
+        </div>
+        <span className="text-xl font-black text-primary shrink-0">{descuento}% OFF</span>
+      </div>
+
+      {/* Slider */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted w-16 shrink-0">Descuento</span>
+        <input
+          type="range" min={5} max={60} step={5}
+          value={descuento}
+          onChange={(e) => setDescuento(Number(e.target.value))}
+          className="flex-1 accent-pink-500"
+        />
+        <span className="text-xs text-muted w-6 shrink-0">{descuento}%</span>
+      </div>
+
+      {/* Métricas */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-pink-50 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-muted mb-1">Precio oferta</p>
+          <p className="text-sm font-black text-primary">${precioOferta.toLocaleString('es-AR')}</p>
+        </div>
+        <div className="bg-orange-50 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-muted mb-1">Menos p/unidad</p>
+          <p className="text-sm font-bold text-orange-600">-${diferencia.toLocaleString('es-AR')}</p>
+        </div>
+        <div className="bg-green-50 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-muted mb-1">Ingreso total</p>
+          <p className="text-sm font-bold text-green-600">${ingresoOferta.toLocaleString('es-AR')}</p>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+          <p className="text-[10px] text-muted mb-1">Sin oferta</p>
+          <p className="text-sm font-semibold text-gray-500">${ingresoFull.toLocaleString('es-AR')}</p>
+        </div>
+      </div>
+
+      {/* Duración + publicar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted shrink-0">Duración:</span>
+        {DURACIONES.map(({ label, horas }) => (
+          <button
+            key={horas}
+            onClick={() => setDuracion(horas)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+              duracion === horas
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          onClick={publicar}
+          disabled={guardando}
+          className="ml-auto btn-primary text-sm py-2 px-5 disabled:opacity-60"
+        >
+          {guardando ? 'Publicando...' : <><Check size={14} /> Publicar oferta</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminOfertas() {
   const [productos, setProductos] = useState([])
   const [ofertas, setOfertas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [creando, setCreando] = useState(null) // producto seleccionado para crear oferta
-  const [descuento, setDescuento] = useState(20)
-  const [duracionHoras, setDuracionHoras] = useState(168)
-  const [guardando, setGuardando] = useState(false)
-  const [tab, setTab] = useState('sugerencias') // 'sugerencias' | 'activas'
+  const [tab, setTab] = useState('sugerencias')
 
-  useEffect(() => { cargar() }, [])
-
-  async function cargar() {
+  const cargar = useCallback(async () => {
     setLoading(true)
     const [{ data: prods }, { data: ofs }] = await Promise.all([
       supabase.from('productos').select('*').eq('activo', true).gt('stock', 0).order('stock', { ascending: false }),
@@ -49,64 +161,21 @@ export default function AdminOfertas() {
     setProductos(prods || [])
     setOfertas(ofs || [])
     setLoading(false)
-  }
+  }, [])
 
-  // Productos ya en oferta
+  useEffect(() => { cargar() }, [cargar])
+
   const idsEnOferta = new Set(ofertas.map((o) => o.producto_id))
 
-  // Sugerencias: ordenadas por conveniencia
-  // 1. Stock alto (mover inventario) 2. Precio alto (descuento impacta más visualmente)
   const sugerencias = productos
     .filter((p) => !idsEnOferta.has(p.id))
-    .map((p) => ({
-      ...p,
-      score: p.stock * 0.6 + (p.precio / 1000) * 0.4,
-    }))
+    .map((p) => ({ ...p, score: p.stock * 0.6 + (p.precio / 1000) * 0.4 }))
     .sort((a, b) => b.score - a.score)
-
-  function abrirCrear(prod) {
-    setCreando(prod)
-    setDescuento(prod.stock >= 10 ? 20 : prod.stock >= 5 ? 15 : 10)
-    setDuracionHoras(168)
-  }
-
-  const precioOferta = creando ? Math.round(creando.precio * (1 - descuento / 100)) : 0
-  const diferenciaPorUnidad = creando ? creando.precio - precioOferta : 0
-  const ingresoSiVendeTodo = creando ? precioOferta * creando.stock : 0
-  const ingresoSinOferta = creando ? creando.precio * creando.stock : 0
-
-  async function publicarOferta() {
-    if (!creando) return
-    setGuardando(true)
-    try {
-      const fechaFin = new Date(Date.now() + duracionHoras * 3600000).toISOString()
-      const { error } = await supabase.from('ofertas').insert({
-        producto_id: creando.id,
-        precio_oferta: precioOferta,
-        fecha_fin: fechaFin,
-        activa: true,
-      })
-      if (error) throw error
-      toast.success(`¡Oferta publicada! ${creando.nombre} al ${descuento}% OFF`)
-      setCreando(null)
-      cargar()
-    } catch {
-      toast.error('Error al publicar la oferta')
-    }
-    setGuardando(false)
-  }
 
   async function desactivarOferta(id) {
     await supabase.from('ofertas').update({ activa: false }).eq('id', id)
     toast.success('Oferta desactivada')
     cargar()
-  }
-
-  const motivoSugerencia = (p) => {
-    if (p.stock >= 15) return { texto: 'Stock alto — ideal para mover', color: 'text-blue-600 bg-blue-50' }
-    if (p.stock >= 8) return { texto: 'Buen stock disponible', color: 'text-green-600 bg-green-50' }
-    if (p.stock <= 3) return { texto: '¡Últimas unidades! Generá urgencia', color: 'text-orange-600 bg-orange-50' }
-    return { texto: 'Recomendado para ofertar', color: 'text-primary bg-pink-50' }
   }
 
   return (
@@ -151,31 +220,9 @@ export default function AdminOfertas() {
                   <p>Todos los productos están en oferta actualmente</p>
                 </div>
               )}
-              {sugerencias.map((p) => {
-                const motivo = motivoSugerencia(p)
-                return (
-                  <div key={p.id} className="card p-4 flex items-center gap-4">
-                    {p.imagen_url
-                      ? <img src={p.imagen_url} alt="" className="w-14 h-14 object-contain rounded-xl border border-gray-100 shrink-0" />
-                      : <div className="w-14 h-14 bg-gray-100 rounded-xl shrink-0 flex items-center justify-center"><Package size={20} className="text-gray-300" /></div>
-                    }
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900 truncate">{p.nombre}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="text-sm font-bold text-gray-800">${p.precio.toLocaleString('es-AR')}</span>
-                        <span className="text-xs text-muted">{p.stock} en stock</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${motivo.color}`}>{motivo.texto}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => abrirCrear(p)}
-                      className="btn-primary text-sm py-2 px-4 shrink-0"
-                    >
-                      <Plus size={14} /> Crear oferta
-                    </button>
-                  </div>
-                )
-              })}
+              {sugerencias.map((p) => (
+                <SugerenciaCard key={p.id} producto={p} onPublicar={cargar} />
+              ))}
             </div>
           )}
 
@@ -222,139 +269,6 @@ export default function AdminOfertas() {
             </div>
           )}
         </>
-      )}
-
-      {/* ── MODAL: CREAR OFERTA ── */}
-      {creando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-display font-bold text-gray-900">Crear oferta</h2>
-              <button onClick={() => setCreando(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-
-            <div className="p-5 space-y-5">
-              {/* Producto */}
-              <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                {creando.imagen_url
-                  ? <img src={creando.imagen_url} alt="" className="w-12 h-12 object-contain rounded-lg shrink-0" />
-                  : <div className="w-12 h-12 bg-gray-200 rounded-lg shrink-0 flex items-center justify-center"><Package size={16} className="text-gray-400" /></div>
-                }
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm text-gray-900 truncate">{creando.nombre}</p>
-                  <p className="text-xs text-muted">{creando.stock} unidades en stock</p>
-                </div>
-              </div>
-
-              {/* Slider descuento */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-semibold text-gray-700">Descuento</label>
-                  <span className="text-2xl font-black text-primary">{descuento}% OFF</span>
-                </div>
-                <input
-                  type="range"
-                  min={5} max={60} step={5}
-                  value={descuento}
-                  onChange={(e) => setDescuento(Number(e.target.value))}
-                  className="w-full accent-pink-500"
-                />
-                <div className="flex justify-between text-xs text-muted mt-1">
-                  <span>5%</span><span>60%</span>
-                </div>
-              </div>
-
-              {/* Comparativa precios */}
-              <div className="bg-pink-50 rounded-xl p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted">Precio actual</span>
-                  <span className="text-sm line-through text-muted">${creando.precio.toLocaleString('es-AR')}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-primary">Precio oferta</span>
-                  <span className="text-xl font-black text-primary">${precioOferta.toLocaleString('es-AR')}</span>
-                </div>
-                <div className="border-t border-pink-200 pt-2 mt-2 space-y-1">
-                  <div className="flex justify-between text-xs text-muted">
-                    <span className="flex items-center gap-1"><TrendingDown size={12} /> Menos por unidad</span>
-                    <span className="text-orange-600 font-semibold">-${diferenciaPorUnidad.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted">
-                    <span>Ingreso si vendés todo</span>
-                    <span className="font-semibold text-green-600">${ingresoSiVendeTodo.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted">
-                    <span>Sin oferta sería</span>
-                    <span>${ingresoSinOferta.toLocaleString('es-AR')}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Duración */}
-              <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Duración</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {DURACIONES.map(({ label, horas }) => (
-                    <button
-                      key={horas}
-                      onClick={() => setDuracionHoras(horas)}
-                      className={`py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                        duracionHoras === horas
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Preview */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Preview en la tienda</p>
-                <div className="border border-gray-200 rounded-xl p-3 flex items-center gap-3 bg-white">
-                  {creando.imagen_url
-                    ? <img src={creando.imagen_url} alt="" className="w-16 h-16 object-contain rounded-lg shrink-0" />
-                    : <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0" />
-                  }
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-white bg-primary px-2 py-0.5 rounded-full">{descuento}% OFF</span>
-                      {creando.stock <= 5 && (
-                        <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">¡Últimas {creando.stock}!</span>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold text-gray-900 truncate">{creando.nombre}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs line-through text-muted">${creando.precio.toLocaleString('es-AR')}</span>
-                      <span className="text-sm font-black text-primary">${precioOferta.toLocaleString('es-AR')}</span>
-                    </div>
-                    <p className="text-xs text-muted mt-0.5 flex items-center gap-1">
-                      <Clock size={10} /> Termina en {DURACIONES.find(d => d.horas === duracionHoras)?.label}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 pb-5 flex gap-3">
-              <button onClick={() => setCreando(null)} className="btn-secondary flex-1 justify-center py-3">
-                Cancelar
-              </button>
-              <button
-                onClick={publicarOferta}
-                disabled={guardando}
-                className="btn-primary flex-1 justify-center py-3 disabled:opacity-60"
-              >
-                {guardando ? 'Publicando...' : <><Check size={16} /> Publicar oferta</>}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
