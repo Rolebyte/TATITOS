@@ -15,6 +15,8 @@ import {
   Clock,
   ExternalLink,
   Search,
+  Tag,
+  Zap,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
@@ -49,6 +51,8 @@ export default function Landing() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
   const [destacados, setDestacados] = useState([])
+  const [ofertas, setOfertas] = useState([])
+  const [tiempos, setTiempos] = useState({})
 
   useEffect(() => {
     async function cargarDestacados() {
@@ -68,6 +72,41 @@ export default function Landing() {
     }
     cargarDestacados()
   }, [])
+
+  useEffect(() => {
+    async function cargarOfertas() {
+      try {
+        const { data } = await supabase
+          .from('ofertas')
+          .select('*, productos(*)')
+          .eq('activa', true)
+          .gt('fecha_fin', new Date().toISOString())
+          .order('created_at', { ascending: false })
+        setOfertas(data || [])
+      } catch { /* sin ofertas */ }
+    }
+    cargarOfertas()
+  }, [])
+
+  useEffect(() => {
+    if (!ofertas.length) return
+    function calcularTiempos() {
+      const t = {}
+      ofertas.forEach((o) => {
+        const diff = new Date(o.fecha_fin) - new Date()
+        if (diff <= 0) { t[o.id] = 'Vencida'; return }
+        const d = Math.floor(diff / 86400000)
+        const h = Math.floor((diff % 86400000) / 3600000)
+        const m = Math.floor((diff % 3600000) / 60000)
+        const s = Math.floor((diff % 60000) / 1000)
+        t[o.id] = d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${s}s`
+      })
+      setTiempos(t)
+    }
+    calcularTiempos()
+    const interval = setInterval(calcularTiempos, 1000)
+    return () => clearInterval(interval)
+  }, [ofertas])
 
   const handleBuscar = (e) => {
     e.preventDefault()
@@ -147,6 +186,77 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Ofertas de la semana */}
+      {ofertas.length > 0 && (
+        <section className="py-16 bg-gradient-to-b from-pink-50 to-white">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap size={16} className="text-primary" />
+                  <span className="text-primary font-semibold text-sm uppercase tracking-wider">Tiempo limitado</span>
+                </div>
+                <h2 className="font-display text-3xl font-bold text-gray-900">Ofertas de la semana</h2>
+              </div>
+              <Link to="/tienda" className="text-primary font-semibold text-sm hover:underline flex items-center gap-1 hidden sm:flex">
+                Ver tienda <ArrowRight size={14} />
+              </Link>
+            </div>
+            <p className="text-muted text-sm mb-8">¡Aprovechá antes de que se agoten!</p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {ofertas.map((oferta) => {
+                const prod = oferta.productos
+                if (!prod) return null
+                const pctOff = Math.round((1 - oferta.precio_oferta / prod.precio) * 100)
+                const pocasUnidades = prod.stock <= 5
+                return (
+                  <Link
+                    key={oferta.id}
+                    to={`/tienda/producto/${prod.id}`}
+                    className="card overflow-hidden hover:shadow-lg transition-shadow duration-200 group"
+                  >
+                    {/* Badge OFF */}
+                    <div className="relative">
+                      <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
+                        {prod.imagen_url
+                          ? <img src={prod.imagen_url} alt={prod.nombre} className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-200" />
+                          : <Package size={40} className="text-gray-200" />
+                        }
+                      </div>
+                      <span className="absolute top-2 left-2 bg-primary text-white text-xs font-black px-2 py-1 rounded-lg shadow-sm">
+                        {pctOff}% OFF
+                      </span>
+                      {pocasUnidades && (
+                        <span className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                          ¡{prod.stock} left!
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      <p className="text-xs font-semibold text-gray-800 leading-tight line-clamp-2 mb-2">{prod.nombre}</p>
+
+                      {/* Precios */}
+                      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                        <span className="text-xs line-through text-muted">${prod.precio.toLocaleString('es-AR')}</span>
+                        <span className="text-base font-black text-primary">${oferta.precio_oferta.toLocaleString('es-AR')}</span>
+                      </div>
+
+                      {/* Countdown */}
+                      <div className="flex items-center gap-1 text-[10px] text-orange-600 font-semibold bg-orange-50 rounded-lg px-2 py-1">
+                        <Clock size={10} />
+                        <span>{tiempos[oferta.id] || '...'}</span>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Productos destacados */}
       {destacados.length > 0 && (
