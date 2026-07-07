@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ShoppingCart, Package, Minus, Plus, Truck, Shield, RotateCcw, Bell, BellRing } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, Package, Minus, Plus, Truck, Shield, RotateCcw, Bell, BellRing, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import useCarritoStore from '../store/carritoStore'
 import useUiStore from '../store/uiStore'
@@ -19,6 +19,7 @@ export default function Producto() {
   const [cantidad, setCantidad] = useState(1)
   const [relacionados, setRelacionados] = useState([])
   const [varianteSeleccionada, setVarianteSeleccionada] = useState(null)
+  const [oferta, setOferta] = useState(null)
   const [avisoNombre, setAvisoNombre] = useState('')
   const [avisoTel, setAvisoTel] = useState('')
   const [avisoCargando, setAvisoCargando] = useState(false)
@@ -35,11 +36,16 @@ export default function Producto() {
       setCantidad(1)
 
       try {
-        const { data, error: err } = await supabase
-          .from('productos')
-          .select('*')
-          .eq('id', id)
-          .single()
+        const [{ data, error: err }, { data: ofertaData }] = await Promise.all([
+          supabase.from('productos').select('*').eq('id', id).single(),
+          supabase
+            .from('ofertas')
+            .select('*')
+            .eq('producto_id', id)
+            .eq('activa', true)
+            .gt('fecha_fin', new Date().toISOString())
+            .maybeSingle(),
+        ])
 
         if (err || !data) {
           setError(true)
@@ -47,6 +53,7 @@ export default function Producto() {
         }
 
         setProducto(data)
+        setOferta(ofertaData || null)
 
         if (data.variantes?.length > 0) {
           const conStock = data.variantes.find((v) => v.stock > 0)
@@ -100,9 +107,14 @@ export default function Producto() {
   }, [id])
 
   const tieneVariantes = producto?.variantes?.length > 0
-  const precioActual = tieneVariantes && varianteSeleccionada
+  const precioBase = tieneVariantes && varianteSeleccionada
     ? (varianteSeleccionada.precio ?? 0)
     : (producto?.precio ?? 0)
+  // Si hay oferta activa (solo aplica al producto sin variante)
+  const precioActual = oferta && !tieneVariantes ? oferta.precio_oferta : precioBase
+  const pctOff = oferta && !tieneVariantes
+    ? Math.round((1 - oferta.precio_oferta / precioBase) * 100)
+    : 0
   const stockActual = tieneVariantes && varianteSeleccionada
     ? (varianteSeleccionada.stock ?? 0)
     : (producto?.stock ?? 0)
@@ -281,19 +293,35 @@ export default function Producto() {
                 {producto.nombre}
               </h1>
 
-              <div className="flex items-center gap-3 mb-4">
-                <span className="font-display font-black text-4xl text-gray-900">
-                  ${precioActual.toLocaleString('es-AR')}
-                </span>
-                {sinStock ? (
-                  <span className="badge bg-red-100 text-red-600">Sin stock</span>
-                ) : stockActual <= 5 ? (
-                  <span className="badge bg-yellow-100 text-yellow-700">
-                    Últimas {stockActual} unidades
-                  </span>
-                ) : (
-                  <span className="badge bg-green-100 text-green-700">En stock</span>
+              <div className="flex flex-col gap-1 mb-4">
+                {oferta && !tieneVariantes && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-white bg-primary px-2.5 py-1 rounded-lg">
+                      {pctOff}% OFF
+                    </span>
+                    <span className="text-lg line-through text-muted">
+                      ${precioBase.toLocaleString('es-AR')}
+                    </span>
+                    <span className="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Clock size={11} />
+                      Oferta limitada
+                    </span>
+                  </div>
                 )}
+                <div className="flex items-center gap-3">
+                  <span className="font-display font-black text-4xl text-gray-900">
+                    ${precioActual.toLocaleString('es-AR')}
+                  </span>
+                  {sinStock ? (
+                    <span className="badge bg-red-100 text-red-600">Sin stock</span>
+                  ) : stockActual <= 5 ? (
+                    <span className="badge bg-yellow-100 text-yellow-700">
+                      Últimas {stockActual} unidades
+                    </span>
+                  ) : (
+                    <span className="badge bg-green-100 text-green-700">En stock</span>
+                  )}
+                </div>
               </div>
 
               {producto.descripcion && (
