@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { MessageCircle, RefreshCw, Download, Bell, Bike, Copy, X, AlertTriangle } from 'lucide-react'
+import { MessageCircle, RefreshCw, Download, Bell, Bike, Copy, X, AlertTriangle, Trash2 } from 'lucide-react'
 
 const ESTADOS = ['pendiente', 'confirmado', 'preparando', 'enviado', 'entregado', 'cancelado']
 const TABS = ['Todos', 'pendiente', 'confirmado', 'preparando', 'enviado', 'entregado', 'cancelado']
@@ -230,6 +230,14 @@ export default function AdminPedidos() {
   }
 
   async function cambiarEstado(id, estado) {
+  async function eliminarPedido(id) {
+    if (!window.confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
+    const { error } = await supabase.from('pedidos').delete().eq('id', id)
+    if (error) { toast.error('Error al eliminar'); return }
+    setPedidos((prev) => prev.filter((p) => p.id !== id))
+    toast.success('Pedido eliminado')
+  }
+
     try {
       const pedidoActual = pedidos.find((p) => p.id === id)
       const { error } = await supabase.from('pedidos').update({ estado }).eq('id', id)
@@ -359,6 +367,7 @@ export default function AdminPedidos() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">WA</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Puni</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -415,6 +424,15 @@ export default function AdminPedidos() {
                         <Bike size={18} />
                       </button>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => eliminarPedido(p.id)}
+                      className="text-gray-300 hover:text-red-500 transition-colors"
+                      title="Eliminar pedido"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
