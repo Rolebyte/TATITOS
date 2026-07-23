@@ -243,7 +243,9 @@ export default function Producto() {
               <ArrowLeft size={14} /> Catálogo
             </Link>
             <span>/</span>
-            <span className="capitalize">{producto.categoria}</span>
+            <Link to={`/tienda?categoria=${encodeURIComponent(producto.categoria)}`} className="capitalize hover:text-primary">
+              {producto.categoria}
+            </Link>
             <span>/</span>
             <span className="text-gray-700 truncate max-w-xs">{producto.nombre}</span>
           </div>
