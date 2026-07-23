@@ -82,6 +82,17 @@ serve(async (req) => {
 
     if (pedidoError) throw pedidoError
 
+    // Descontar stock inmediatamente al crear el pedido
+    for (const item of items) {
+      if (item.producto_id) {
+        await supabase.rpc('decrementar_stock', {
+          p_id: item.producto_id,
+          p_cantidad: item.cantidad,
+        })
+      }
+    }
+    await supabase.from('pedidos').update({ stock_descontado: true }).eq('id', pedido.id)
+
     // Notificación WhatsApp a los dueños
     await notificarDuenos(pedido, items, tipo_entrega, total, metodo_pago)
 
