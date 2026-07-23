@@ -5,7 +5,7 @@ function formatPeso(n: number): string {
   return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
-async function notificarDuenos(pedido: any, items: any[], tipo_entrega: string, total: number) {
+async function notificarDuenos(pedido: any, items: any[], tipo_entrega: string, total: number, metodo_pago: string) {
   const duenos = [
     { phone: '5493492627811', apikey: '5568416' },
     { phone: '5493493459749', apikey: '6063730' },
@@ -17,12 +17,16 @@ async function notificarDuenos(pedido: any, items: any[], tipo_entrega: string, 
     tipo_entrega === 'domicilio' ? 'Envio a domicilio' :
     tipo_entrega === 'localidad' ? 'Envio a localidad' : 'Retiro'
 
+  const metodoTexto =
+    metodo_pago === 'efectivo' ? 'Efectivo' :
+    metodo_pago === 'transferencia' ? 'Transferencia' : 'Mercado Pago'
+
   const mensaje = [
     `Nuevo pedido #${numeroFormateado}`,
     `${pedido.cliente_nombre} - ${pedido.cliente_telefono}`,
     itemsTexto,
     `Total: ${formatPeso(total)}`,
-    entregaTexto,
+    `${entregaTexto} — ${metodoTexto}`,
   ].join('\n')
 
   await Promise.allSettled(
@@ -43,7 +47,7 @@ serve(async (req) => {
   }
 
   try {
-    const { cliente, items, tipo_entrega, direccion, notas, costo_envio, cupon_codigo, descuento } = await req.json()
+    const { cliente, items, tipo_entrega, direccion, notas, costo_envio, cupon_codigo, descuento, metodo_pago = 'mercadopago', recargo_mp = 0 } = await req.json()
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -51,7 +55,7 @@ serve(async (req) => {
     )
 
     const subtotal = items.reduce((acc: number, i: any) => acc + i.precio * i.cantidad, 0)
-    const total = subtotal + (costo_envio || 0)
+    const total = subtotal + (costo_envio || 0) + (recargo_mp || 0)
 
     // Crear pedido en Supabase
     const { data: pedido, error: pedidoError } = await supabase
@@ -69,14 +73,30 @@ serve(async (req) => {
         total,
         cupon_codigo: cupon_codigo || null,
         descuento: descuento || 0,
-        estado: 'pendiente',
+        metodo_pago,
+        recargo_mp: recargo_mp || 0,
+        estado: metodo_pago === 'mercadopago' ? 'pendiente' : 'pendiente',
       })
       .select()
       .single()
 
     if (pedidoError) throw pedidoError
 
-    // Crear preference en Mercado Pago
+    // Notificación WhatsApp a los dueños
+    await notificarDuenos(pedido, items, tipo_entrega, total, metodo_pago)
+
+    // Para efectivo/transferencia: no necesita MP
+    if (metodo_pago !== 'mercadopago') {
+      return new Response(
+        JSON.stringify({
+          pedido_id: pedido.id,
+          numero: pedido.numero,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ── MercadoPago ──
     const appUrl = Deno.env.get('APP_URL') || 'https://tatitos.netlify.app'
     const mpAccessToken = Deno.env.get('MP_ACCESS_TOKEN')!
 
@@ -93,6 +113,16 @@ serve(async (req) => {
         id: 'envio',
         title: 'Costo de envío',
         unit_price: Number(costo_envio),
+        quantity: 1,
+        currency_id: 'ARS',
+      })
+    }
+
+    if (recargo_mp > 0) {
+      mpItems.push({
+        id: 'recargo_mp',
+        title: 'Recargo Mercado Pago',
+        unit_price: Number(recargo_mp),
         quantity: 1,
         currency_id: 'ARS',
       })
@@ -132,14 +162,10 @@ serve(async (req) => {
 
     const mpData = await mpRes.json()
 
-    // Guardar preference_id en el pedido
     await supabase
       .from('pedidos')
       .update({ mp_preference_id: mpData.id })
       .eq('id', pedido.id)
-
-    // Notificación WhatsApp a los dueños via CallMeBot
-    await notificarDuenos(pedido, items, tipo_entrega, total)
 
     return new Response(
       JSON.stringify({

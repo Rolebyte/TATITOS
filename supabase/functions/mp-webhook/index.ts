@@ -1,113 +1,91 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-async function notificarCliente(telefono: string, nombre: string, numero: number) {
-  const duenos = [
-    { phone: '5493492627811', apikey: '5568416' },
-    { phone: '5493493459749', apikey: '6063730' },
-  ]
-
-  const numeroFormateado = String(numero).padStart(4, '0')
-  const mensaje = `✅ Hola ${encodeURIComponent(nombre)}! Tu pago fue confirmado 🎉%0ATu pedido %23${numeroFormateado} está siendo preparado.%0AEn breve te contactamos para coordinar la entrega. ¡Gracias por elegirnos! 💕`
-
-  const clientePhone = `549${telefono.replace(/\D/g, '').slice(-10)}`
-  await fetch(`https://api.callmebot.com/whatsapp.php?phone=${clientePhone}&text=${mensaje}&apikey=${duenos[0].apikey}`)
-    .catch(() => {})
-
-  const mensajeDuenos = `✅ Pago confirmado — Pedido %23${numeroFormateado}%0A👤 ${encodeURIComponent(nombre)}%0A💳 Pagó con Mercado Pago`
-  await Promise.allSettled(
-    duenos.map(({ phone, apikey }) =>
-      fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${mensajeDuenos}&apikey=${apikey}`)
-    )
-  )
-}
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
   try {
-    const body = await req.json()
+    const url = new URL(req.url)
 
-    if (body.type !== 'payment' && body.topic !== 'payment') {
-      return new Response('ok', { headers: corsHeaders })
+    // MP sends notifications either as query params (IPN) or JSON body (Webhooks)
+    let topic = url.searchParams.get('topic') || url.searchParams.get('type')
+    let id = url.searchParams.get('id') || url.searchParams.get('data.id')
+
+    // Parse JSON body for modern MP webhook format
+    if (!id || !topic) {
+      try {
+        const body = await req.json()
+        topic = topic || body.type || body.topic
+        id = id || body.data?.id || body.id
+      } catch {
+        // not JSON, ignore
+      }
     }
 
-    const paymentId = body.data?.id || body.id
-    if (!paymentId) {
-      return new Response('ok', { headers: corsHeaders })
+    if (topic !== 'payment' && topic !== 'merchant_order') {
+      return new Response('ok', { status: 200 })
+    }
+
+    if (!id) {
+      return new Response('ok', { status: 200 })
     }
 
     const mpAccessToken = Deno.env.get('MP_ACCESS_TOKEN')!
-    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${mpAccessToken}` },
-    })
-
-    if (!mpRes.ok) throw new Error(`MP fetch error: ${mpRes.status}`)
-    const payment = await mpRes.json()
-
-    if (payment.status !== 'approved') {
-      return new Response('ok', { headers: corsHeaders })
-    }
-
-    const pedidoId = payment.external_reference
-    if (!pedidoId) {
-      return new Response('ok', { headers: corsHeaders })
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: pedido, error: pedidoError } = await supabase
-      .from('pedidos')
-      .select('*')
-      .eq('id', pedidoId)
-      .single()
+    // Consultar pago en MP
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
+      headers: { Authorization: `Bearer ${mpAccessToken}` },
+    })
 
-    if (pedidoError || !pedido) throw new Error('Pedido no encontrado')
+    if (!mpRes.ok) return new Response('ok', { status: 200 })
 
-    if (pedido.mp_payment_id === String(paymentId)) {
-      return new Response('ok', { headers: corsHeaders })
-    }
+    const payment = await mpRes.json()
+    const pedidoId = payment.external_reference
 
+    if (!pedidoId) return new Response('ok', { status: 200 })
+
+    const mpStatus = payment.status
+    let nuevoEstado = 'pendiente'
+
+    if (mpStatus === 'approved') nuevoEstado = 'confirmado'
+    else if (mpStatus === 'rejected' || mpStatus === 'cancelled') nuevoEstado = 'cancelado'
+
+    // Actualizar pedido
     await supabase
       .from('pedidos')
       .update({
-        estado: 'confirmado',
-        mp_payment_id: String(paymentId),
-        mp_status: payment.status,
+        estado: nuevoEstado,
+        mp_payment_id: String(payment.id),
+        mp_status: mpStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', pedidoId)
 
-    const items = pedido.items as Array<{ producto_id: string; cantidad: number }>
-    await Promise.allSettled(
-      items.map((item) =>
-        supabase.rpc('decrementar_stock', {
-          p_id: item.producto_id,
-          p_cantidad: item.cantidad,
-        })
-      )
-    )
+    // Si fue aprobado, descontar stock
+    if (mpStatus === 'approved') {
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('items')
+        .eq('id', pedidoId)
+        .single()
 
-    await notificarCliente(pedido.cliente_telefono, pedido.cliente_nombre, pedido.numero)
+      if (pedido?.items) {
+        for (const item of pedido.items) {
+          if (item.producto_id) {
+            await supabase.rpc('decrementar_stock', {
+              p_id: item.producto_id,
+              p_cantidad: item.cantidad,
+            })
+          }
+        }
+      }
+    }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response('ok', { status: 200 })
   } catch (err) {
     console.error(err)
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response('error', { status: 500 })
   }
 })

@@ -277,6 +277,7 @@ export default function Carrito() {
         cupon_codigo: cuponAplicado?.codigo || null,
         descuento,
         recargo_mp: recargoMP,
+        metodo_pago: 'mercadopago',
       }
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-pedido`, {
@@ -297,7 +298,33 @@ export default function Carrito() {
   }
 
   // ── Pagar por WhatsApp ────────────────────────────────────
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
+    setCargando(true)
+    try {
+      const direccionFinal =
+        form.tipo_entrega === 'domicilio' ? form.direccion
+        : form.tipo_entrega === 'localidad' ? `${form.ciudad}, ${form.provincia}`
+        : 'Retiro en local'
+
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-pedido`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          cliente: { nombre: form.nombre, telefono: form.telefono, email: form.email },
+          items: items.map((i) => ({ producto_id: i.id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
+          tipo_entrega: form.tipo_entrega,
+          direccion: direccionFinal,
+          notas: form.notas,
+          costo_envio: costoEnvio(form),
+          cupon_codigo: cuponAplicado?.codigo || null,
+          descuento,
+          metodo_pago: metodoPago,
+        }),
+      })
+    } catch {
+      // Si falla el registro no bloqueamos el pedido por WhatsApp
+    }
+
     const lineasItems = items
       .map((i) => `• ${i.nombre} × ${i.cantidad} → $${(i.precio * i.cantidad).toLocaleString('es-AR')}`)
       .join('\n')
