@@ -22,6 +22,7 @@ import AdminPromos from './pages/admin/AdminPromos'
 import AdminEscaner from './pages/admin/AdminEscaner'
 import AdminIngresos from './pages/admin/AdminIngresos'
 import AdminOfertas from './pages/admin/AdminOfertas'
+import AdminImagenes from './pages/admin/AdminImagenes'
 import AdminLayout from './components/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import CarritoDrawer from './components/CarritoDrawer'
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="/admin/escaner" element={<AdminEscaner />} />
             <Route path="/admin/ingresos" element={<AdminIngresos />} />
             <Route path="/admin/ofertas" element={<AdminOfertas />} />
+            <Route path="/admin/imagenes" element={<AdminImagenes />} />
           </Route>
         </Route>
 
