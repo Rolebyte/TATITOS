@@ -149,6 +149,7 @@ export default function AdminPedidos() {
   const [nuevos, setNuevos] = useState(0)
   const [pedidoPuni, setPedidoPuni] = useState(null)
   const [abandonados, setAbandonados] = useState([])
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null)
   const esDemo = useRef(false)
 
   useEffect(() => {
@@ -230,10 +231,10 @@ export default function AdminPedidos() {
   }
 
   async function eliminarPedido(id) {
-    if (!window.confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
     const { error } = await supabase.from('pedidos').delete().eq('id', id)
     if (error) { toast.error('Error al eliminar'); return }
     setPedidos((prev) => prev.filter((p) => p.id !== id))
+    setConfirmandoEliminar(null)
     toast.success('Pedido eliminado')
   }
 
@@ -438,13 +439,30 @@ export default function AdminPedidos() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => eliminarPedido(p.id)}
-                      className="text-gray-300 hover:text-red-500 transition-colors"
-                      title="Eliminar pedido"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {confirmandoEliminar === p.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => eliminarPedido(p.id)}
+                          className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded-lg transition-colors"
+                        >
+                          Sí
+                        </button>
+                        <button
+                          onClick={() => setConfirmandoEliminar(null)}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg transition-colors"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmandoEliminar(p.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors"
+                        title="Eliminar pedido"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
