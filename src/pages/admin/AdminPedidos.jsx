@@ -229,7 +229,6 @@ export default function AdminPedidos() {
     cancelado: (nombre, num) => `Hola ${nombre}. Tu pedido #${num} fue cancelado. Comunicate con nosotros para mas info.`,
   }
 
-  async function cambiarEstado(id, estado) {
   async function eliminarPedido(id) {
     if (!window.confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
     const { error } = await supabase.from('pedidos').delete().eq('id', id)
@@ -238,12 +237,25 @@ export default function AdminPedidos() {
     toast.success('Pedido eliminado')
   }
 
+  async function cambiarEstado(id, estado) {
     try {
       const pedidoActual = pedidos.find((p) => p.id === id)
       const { error } = await supabase.from('pedidos').update({ estado }).eq('id', id)
       if (error) throw error
       setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, estado } : p)))
       toast.success('Estado actualizado')
+
+      // Descontar stock al confirmar (solo si no fue descontado ya)
+      if (estado === 'confirmado' && pedidoActual && !pedidoActual.stock_descontado) {
+        const items = pedidoActual.items || []
+        for (const item of items) {
+          if (item.producto_id) {
+            await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad })
+          }
+        }
+        await supabase.from('pedidos').update({ stock_descontado: true }).eq('id', id)
+        setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, stock_descontado: true } : p)))
+      }
 
       const generarMensaje = MENSAJES_ESTADO[estado]
       if (generarMensaje && pedidoActual) {

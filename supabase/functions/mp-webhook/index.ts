@@ -63,15 +63,15 @@ serve(async (req) => {
       })
       .eq('id', pedidoId)
 
-    // Si fue aprobado, descontar stock
+    // Si fue aprobado, descontar stock (solo si no fue descontado ya)
     if (mpStatus === 'approved') {
       const { data: pedido } = await supabase
         .from('pedidos')
-        .select('items')
+        .select('items, stock_descontado')
         .eq('id', pedidoId)
         .single()
 
-      if (pedido?.items) {
+      if (pedido?.items && !pedido.stock_descontado) {
         for (const item of pedido.items) {
           if (item.producto_id) {
             await supabase.rpc('decrementar_stock', {
@@ -80,6 +80,7 @@ serve(async (req) => {
             })
           }
         }
+        await supabase.from('pedidos').update({ stock_descontado: true }).eq('id', pedidoId)
       }
     }
 
